@@ -1,8 +1,10 @@
+**中文说明 / Chinese:** [README.zh-CN.md](README.zh-CN.md)
+
+---
+
 # Cursor CLI × Telegram Bot
 
 Connect [Cursor Agent CLI](https://cursor.com) to Telegram. Use Cursor’s AI from your phone or any device by chatting with the bot.
-
-**中文说明 / Chinese:** [README.zh-CN.md](README.zh-CN.md)
 
 ---
 

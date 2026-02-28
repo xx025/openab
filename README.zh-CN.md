@@ -1,8 +1,10 @@
+**English:** [README.md](README.md)
+
+---
+
 # Cursor CLI × Telegram 机器人
 
 将 [Cursor Agent CLI](https://cursor.com) 对接到 Telegram，在手机或任意设备上通过对话使用 Cursor 的 AI。
-
-**English:** [README.md](README.md)
 
 ---
 
