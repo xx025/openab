@@ -55,6 +55,7 @@ New keys are written to the existing config file (YAML or JSON by path); if no f
 | `openab config path` | Print config file path |
 | `openab config get [key]` | Show config or value at key |
 | `openab config set <key> <value>` | Set config key and save |
+| `openab install-service` | Install as a **Linux user-level systemd service** (optional: `--discord` for Discord, `--start` to start now). Linux only. |
 
 Options: `--token`, `--workspace`, `--verbose` (e.g. `openab --token "..." --workspace /path/to/dir`).
 

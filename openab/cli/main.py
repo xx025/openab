@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+import subprocess
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -36,22 +38,84 @@ def _get_workspace(config: dict, workspace: Optional[Path]) -> Path:
     return resolve_workspace(config, workspace)
 
 
-def _get_telegram_token(config: dict, token: Optional[str]) -> str:
-    t = (token or "").strip() or (config.get("telegram") or {}).get("bot_token") or ""
+def _is_interactive() -> bool:
+    return sys.stdin.isatty()
+
+
+def _ask_save_config() -> bool:
+    try:
+        ans = input(cli_t("run_prompt_save_config")).strip().lower()
+        return ans not in ("n", "no")
+    except (EOFError, KeyboardInterrupt):
+        return False
+
+
+def _ensure_telegram_run_config(
+    config: dict, token_cli: Optional[str]
+) -> tuple[str, frozenset[int], dict]:
+    """若配置/CLI 无 token 且在交互环境则引导输入并可选保存；返回 (token, allowed_user_ids, config)。"""
+    t = (token_cli or "").strip() or (config.get("telegram") or {}).get("bot_token") or ""
     t = (t or "").strip()
+    if not t and _is_interactive():
+        try:
+            t = input(cli_t("run_prompt_telegram_token")).strip()
+            if t:
+                config.setdefault("telegram", {})["bot_token"] = t
+                if _ask_save_config():
+                    get_config_path().parent.mkdir(parents=True, exist_ok=True)
+                    save_config(config)
+        except (EOFError, KeyboardInterrupt):
+            pass
     if not t:
         typer.echo(cli_t("err_no_token"), err=True)
         raise typer.Exit(1)
-    return t
+    allowed = parse_allowed_user_ids((config.get("telegram") or {}).get("allowed_user_ids"))
+    if not allowed and _is_interactive():
+        try:
+            val = input(cli_t("run_prompt_allowed_telegram")).strip()
+            if val:
+                ids = coerce_config_value("telegram.allowed_user_ids", val)
+                _set_nested(config, "telegram.allowed_user_ids", ids)
+                if _ask_save_config():
+                    save_config(config)
+                allowed = parse_allowed_user_ids(ids)
+        except (EOFError, KeyboardInterrupt):
+            pass
+    return (t, allowed, config)
 
 
-def _get_discord_token(config: dict, token: Optional[str]) -> str:
-    t = (token or "").strip() or (config.get("discord") or {}).get("bot_token") or ""
+def _ensure_discord_run_config(
+    config: dict, token_cli: Optional[str]
+) -> tuple[str, frozenset[int], dict]:
+    """若配置/CLI 无 token 且在交互环境则引导输入并可选保存；返回 (token, allowed_user_ids, config)。"""
+    t = (token_cli or "").strip() or (config.get("discord") or {}).get("bot_token") or ""
     t = (t or "").strip()
+    if not t and _is_interactive():
+        try:
+            t = input(cli_t("run_prompt_discord_token")).strip()
+            if t:
+                config.setdefault("discord", {})["bot_token"] = t
+                if _ask_save_config():
+                    get_config_path().parent.mkdir(parents=True, exist_ok=True)
+                    save_config(config)
+        except (EOFError, KeyboardInterrupt):
+            pass
     if not t:
         typer.echo(cli_t("err_no_token_discord"), err=True)
         raise typer.Exit(1)
-    return t
+    allowed = parse_allowed_user_ids((config.get("discord") or {}).get("allowed_user_ids"))
+    if not allowed and _is_interactive():
+        try:
+            val = input(cli_t("run_prompt_allowed_discord")).strip()
+            if val:
+                ids = coerce_config_value("discord.allowed_user_ids", val)
+                _set_nested(config, "discord.allowed_user_ids", ids)
+                if _ask_save_config():
+                    save_config(config)
+                allowed = parse_allowed_user_ids(ids)
+        except (EOFError, KeyboardInterrupt):
+            pass
+    return (t, allowed, config)
 
 
 @app.callback(invoke_without_command=True)
@@ -77,9 +141,8 @@ def run(
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
     config = load_config()
-    t = _get_telegram_token(config, token)
+    t, allowed, config = _ensure_telegram_run_config(config, token)
     ws = _get_workspace(config, workspace)
-    allowed = parse_allowed_user_ids((config.get("telegram") or {}).get("allowed_user_ids"))
     timeout = (config.get("agent") or {}).get("timeout")
     timeout = int(timeout) if timeout is not None else 300
     typer.echo(cli_t("starting"))
@@ -104,9 +167,8 @@ def run_discord(
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
     config = load_config()
-    t = _get_discord_token(config, token)
+    t, allowed, config = _ensure_discord_run_config(config, token)
     ws = _get_workspace(config, workspace)
-    allowed = parse_allowed_user_ids((config.get("discord") or {}).get("allowed_user_ids"))
     timeout = (config.get("agent") or {}).get("timeout")
     timeout = int(timeout) if timeout is not None else 300
     typer.echo(cli_t("starting_discord"))
@@ -166,3 +228,100 @@ def config_path_legacy() -> None:
     """Print default config file path (deprecated: use 'openab config path')."""
     p = get_config_path()
     typer.echo(str(p))
+
+
+def _install_wizard() -> tuple[bool, bool, bool]:
+    """
+    交互式引导：选择安装 Telegram / Discord / 两者，补全配置，询问是否立即启动。
+    返回 (install_telegram, install_discord, start_now)。
+    """
+    typer.echo(cli_t("install_wizard_title"))
+    typer.echo("")
+    typer.echo(cli_t("install_wizard_which"))
+    choice = input(cli_t("install_wizard_which_prompt")).strip() or "1"
+    install_telegram = choice in ("1", "3")
+    install_discord = choice in ("2", "3")
+    if not install_telegram and not install_discord:
+        install_telegram = True
+
+    config = load_config()
+    config_path = get_config_path()
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    changed = False
+
+    if install_telegram:
+        tg = config.setdefault("telegram", {})
+        if not (tg.get("bot_token") or "").strip():
+            val = input(cli_t("install_wizard_telegram_token")).strip()
+            if val:
+                _set_nested(config, "telegram.bot_token", val)
+                changed = True
+        if not parse_allowed_user_ids(tg.get("allowed_user_ids")):
+            val = input(cli_t("install_wizard_telegram_allowed")).strip()
+            if val:
+                _set_nested(config, "telegram.allowed_user_ids", coerce_config_value("telegram.allowed_user_ids", val))
+                changed = True
+    if install_discord:
+        dc = config.setdefault("discord", {})
+        if not (dc.get("bot_token") or "").strip():
+            val = input(cli_t("install_wizard_discord_token")).strip()
+            if val:
+                _set_nested(config, "discord.bot_token", val)
+                changed = True
+        if not parse_allowed_user_ids(dc.get("allowed_user_ids")):
+            val = input(cli_t("install_wizard_discord_allowed")).strip()
+            if val:
+                _set_nested(config, "discord.allowed_user_ids", coerce_config_value("discord.allowed_user_ids", val))
+                changed = True
+
+    if changed:
+        path = save_config(config)
+        typer.echo(cli_t("install_wizard_config_saved", path=path))
+
+    start_now = False
+    try:
+        ans = input(cli_t("install_wizard_start_now")).strip().lower()
+        start_now = ans in ("y", "yes")
+    except (EOFError, KeyboardInterrupt):
+        pass
+    return install_telegram, install_discord, start_now
+
+
+@app.command("install-service", help=cli_t("install_service_help"))
+def install_service(
+    discord: bool = typer.Option(False, "--discord", help="Install Discord bot service (openab-discord.service) instead of Telegram."),
+    start: bool = typer.Option(False, "--start", help="Start the service immediately after enable."),
+    no_interactive: bool = typer.Option(False, "--no-interactive", help=cli_t("install_wizard_skip_interactive")),
+) -> None:
+    """Install OpenAB as a user-level systemd service (Linux only)."""
+    try:
+        from openab.cli.service_linux import install_user_service
+
+        if no_interactive:
+            install_telegram = not discord
+            install_discord = discord
+            start_now = start
+        else:
+            install_telegram, install_discord, start_now = _install_wizard()
+
+        if install_telegram:
+            typer.echo(cli_t("install_wizard_installing_telegram"))
+            path = install_user_service(discord=False, start=start_now)
+            typer.echo(cli_t("install_service_done", path=path))
+        if install_discord:
+            typer.echo(cli_t("install_wizard_installing_discord"))
+            path = install_user_service(discord=True, start=start_now)
+            typer.echo(cli_t("install_service_done_discord", path=path))
+        if not install_telegram and not install_discord:
+            typer.echo(cli_t("install_service_linux_only"), err=True)
+            raise typer.Exit(1)
+        typer.echo(cli_t("install_wizard_done"))
+    except RuntimeError as e:
+        if "only supported on Linux" in str(e):
+            typer.echo(cli_t("install_service_linux_only"), err=True)
+        else:
+            typer.echo(str(e), err=True)
+        raise typer.Exit(1)
+    except subprocess.CalledProcessError as e:
+        typer.echo(f"systemctl failed: {e}", err=True)
+        raise typer.Exit(1)
