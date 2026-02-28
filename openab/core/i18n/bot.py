@@ -5,9 +5,10 @@ MESSAGES = {
     "zh": {
         "unauthorized": (
             "您没有权限使用此机器人。\n\n"
-            "【增加鉴权】请将你的 Telegram User ID 提供给管理员，由管理员将你的 ID 加入白名单（ALLOWED_USER_IDS）后即可使用。\n\n"
+            "【增加鉴权】请将你的 User ID 提供给管理员，由管理员将你的 ID 加入白名单后即可使用。\n\n"
             "发送 /whoami 可查看你的 User ID。"
         ),
+        "unauthorized_cli_hint": "管理员可运行：{cmd}",
         "start_welcome": (
             "你好，这是 OpenAB 机器人。\n\n"
             "直接发送任意文字，我会把它交给已配置的智能体处理并回复你。\n\n"
@@ -32,9 +33,10 @@ MESSAGES = {
     "en": {
         "unauthorized": (
             "You don't have permission to use this bot.\n\n"
-            "[Get access] Ask the admin to add your Telegram User ID to the allowlist (ALLOWED_USER_IDS), then you can use the bot.\n\n"
+            "[Get access] Ask the admin to add your User ID to the allowlist, then you can use the bot.\n\n"
             "Send /whoami to see your User ID."
         ),
+        "unauthorized_cli_hint": "Admin can run: {cmd}",
         "start_welcome": (
             "Hi, this is the OpenAB bot.\n\n"
             "Send any text and I'll pass it to the configured agent and reply with the result.\n\n"

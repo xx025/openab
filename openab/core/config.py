@@ -34,11 +34,16 @@ def _find_config_file() -> Path | None:
     return None
 
 
-def load_config() -> dict[str, Any]:
-    """从默认或 OPENAB_CONFIG 指定路径加载 YAML 或 JSON，文件不存在或解析失败返回空 dict。"""
-    path = _find_config_file()
-    if not path:
-        return {}
+def load_config(explicit_path: Path | None = None) -> dict[str, Any]:
+    """从指定路径或默认/OPENAB_CONFIG 路径加载 YAML 或 JSON，文件不存在或解析失败返回空 dict。"""
+    if explicit_path is not None:
+        path = explicit_path.expanduser().resolve()
+        if not path.is_file():
+            return {}
+    else:
+        path = _find_config_file()
+        if not path:
+            return {}
     try:
         text = path.read_text(encoding="utf-8")
         suf = path.suffix.lower()

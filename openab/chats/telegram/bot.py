@@ -48,7 +48,8 @@ async def _send_typing_until_done(chat_id: int, context: ContextTypes.DEFAULT_TY
 def _user_lang(update: Update) -> str:
     if update.effective_user and update.effective_user.language_code:
         return lang_from_telegram(update.effective_user.language_code)
-    return "en"
+    from openab.core.i18n import lang_from_env
+    return lang_from_env()
 
 
 def _allowed(context: ContextTypes.DEFAULT_TYPE) -> frozenset[int]:
@@ -60,7 +61,10 @@ def _is_auth_enabled(context: ContextTypes.DEFAULT_TYPE) -> bool:
 
 
 def _is_user_allowed(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    return user_id in _allowed(context)
+    allowed = _allowed(context)
+    if len(allowed) == 0:
+        return True  # 未设置白名单时允许所有人（启动时已警告）
+    return user_id in allowed
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -71,8 +75,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if _is_user_allowed(user_id, context):
         msg = t(lang, "start_welcome")
     else:
-        key = "auth_not_configured" if not _is_auth_enabled(context) else "unauthorized"
-        msg = t(lang, key) + "\n\n" + t(lang, "your_user_id") + f"<code>{user_id}</code>"
+        msg = t(lang, "unauthorized") + "\n\n" + t(lang, "your_user_id") + f"<code>{user_id}</code>"
+        msg += "\n\n" + t(lang, "unauthorized_cli_hint", cmd=f"openab allowlist add {user_id}")
     await update.message.reply_text(msg, parse_mode="HTML")
 
 
@@ -98,8 +102,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user_id = update.effective_user.id if update.effective_user else 0
     lang = _user_lang(update)
     if not _is_user_allowed(user_id, context):
-        key = "auth_not_configured" if not _is_auth_enabled(context) else "unauthorized"
-        msg = t(lang, key) + "\n\n" + t(lang, "your_user_id") + f"<code>{user_id}</code>"
+        msg = t(lang, "unauthorized") + "\n\n" + t(lang, "your_user_id") + f"<code>{user_id}</code>"
+        msg += "\n\n" + t(lang, "unauthorized_cli_hint", cmd=f"openab allowlist add {user_id}")
         await update.message.reply_text(msg, parse_mode="HTML")
         return
 

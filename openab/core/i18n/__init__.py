@@ -7,13 +7,26 @@ from typing import Any
 from openab.core.i18n.bot import MESSAGES
 from openab.core.i18n.cli import CLI_MESSAGES
 
+# 无法从系统获取时的回退语言
 DEFAULT_LANG = "en"
 
 
+def _system_lang() -> str:
+    """从环境变量 LANG / LANGUAGE / LC_ALL 解析系统语言，不依赖 _normalize_lang 避免循环。"""
+    for key in ("LANG", "LANGUAGE", "LC_ALL"):
+        val = os.environ.get(key, "")
+        if val:
+            code = val.split(":")[0].split(".")[0].strip().lower()
+            if code.startswith("zh"):
+                return "zh"
+            return "en"
+    return DEFAULT_LANG
+
+
 def _normalize_lang(code: str | None) -> str:
-    """Telegram language_code 或 LANG → 'zh' | 'en'。"""
-    if not code:
-        return DEFAULT_LANG
+    """Telegram language_code 或 LANG → 'zh' | 'en'。无 code 时使用系统语言。"""
+    if not (code or "").strip():
+        return _system_lang()
     code = (code or "").strip().lower()
     if code.startswith("zh"):
         return "zh"
@@ -21,17 +34,13 @@ def _normalize_lang(code: str | None) -> str:
 
 
 def lang_from_telegram(language_code: str | None) -> str:
-    """根据 Telegram 用户的 language_code 返回 'zh' 或 'en'。"""
+    """根据 Telegram 用户的 language_code 返回 'zh' 或 'en'；未提供时用系统语言。"""
     return _normalize_lang(language_code)
 
 
 def lang_from_env() -> str:
     """根据环境变量 LANG / LANGUAGE 返回 'zh' 或 'en'（用于 CLI）。"""
-    for key in ("LANG", "LANGUAGE", "LC_ALL"):
-        val = os.environ.get(key, "")
-        if val:
-            return _normalize_lang(val.split(":")[0].split(".")[0])
-    return DEFAULT_LANG
+    return _system_lang()
 
 
 def t(lang: str, key: str, **kwargs: Any) -> str:

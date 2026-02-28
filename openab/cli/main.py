@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -151,10 +152,13 @@ def _ensure_discord_run_config(
 @app.callback(invoke_without_command=True)
 def _default(
     ctx: typer.Context,
+    config: Optional[Path] = typer.Option(None, "--config", "-c", path_type=Path, help=cli_t("opt_config")),
     token: Optional[str] = typer.Option(None, "--token", "-t", help=cli_t("opt_token")),
     workspace: Optional[Path] = typer.Option(None, "--workspace", "-w", path_type=Path, help=cli_t("opt_workspace")),
     verbose: bool = typer.Option(False, "--verbose", "-v", help=cli_t("opt_verbose")),
 ) -> None:
+    if config is not None:
+        os.environ["OPENAB_CONFIG"] = str(config.expanduser().resolve())
     if ctx.invoked_subcommand is None:
         ctx.invoke(run, token=token, workspace=workspace, verbose=verbose)
 
@@ -176,6 +180,8 @@ def run(
     ws = _get_workspace(config, workspace)
     timeout = (config.get("agent") or {}).get("timeout")
     timeout = int(timeout) if timeout is not None else 300
+    if not allowed:
+        typer.echo(cli_t("allowlist_empty_warning"), err=True)
     typer.echo(cli_t("starting"))
     run_telegram_bot(
         t,
@@ -203,6 +209,8 @@ def run_discord(
     ws = _get_workspace(config, workspace)
     timeout = (config.get("agent") or {}).get("timeout")
     timeout = int(timeout) if timeout is not None else 300
+    if not allowed:
+        typer.echo(cli_t("allowlist_empty_warning"), err=True)
     typer.echo(cli_t("starting_discord"))
     run_discord_bot(
         t,
@@ -217,16 +225,39 @@ config_app = typer.Typer(help="Read or write config file (YAML/JSON).")
 app.add_typer(config_app, name="config")
 
 
+@config_app.callback()
+def config_callback(
+    ctx: typer.Context,
+    config: Optional[Path] = typer.Option(None, "--config", "-c", path_type=Path, help="Config file path (default: OPENAB_CONFIG or ~/.config/openab/config.yaml)."),
+) -> None:
+    """Optional config file for this invocation."""
+    ctx.obj = ctx.obj or {}
+    ctx.obj["config_file"] = config.expanduser().resolve() if config else None
+
+
+def _config_file_from_ctx(ctx: typer.Context) -> Path | None:
+    """从 config 子命令的 context 取可选配置文件（父级 config 的 -c 或全局 --config 已写入 OPENAB_CONFIG）。"""
+    if ctx.parent and ctx.parent.obj:
+        return ctx.parent.obj.get("config_file")
+    return None
+
+
 @config_app.command("path")
-def config_path_cmd() -> None:
+def config_path_cmd(ctx: typer.Context) -> None:
     """Print config file path (current or default)."""
-    typer.echo(str(get_config_file_path()))
+    cf = _config_file_from_ctx(ctx)
+    path = cf if cf else get_config_file_path()
+    typer.echo(str(path))
 
 
 @config_app.command("get")
-def config_get(key: Optional[str] = typer.Argument(None, help="Dot key, e.g. agent.backend (omit to show all).")) -> None:
+def config_get(
+    ctx: typer.Context,
+    key: Optional[str] = typer.Argument(None, help="Dot key, e.g. agent.backend (omit to show all)."),
+) -> None:
     """Show config or value at key."""
-    cfg = load_config()
+    cf = _config_file_from_ctx(ctx)
+    cfg = load_config(cf)
     if not key:
         import json
         typer.echo(json.dumps(cfg, indent=2, ensure_ascii=False))
@@ -243,12 +274,14 @@ def config_get(key: Optional[str] = typer.Argument(None, help="Dot key, e.g. age
 
 @config_app.command("set")
 def config_set(
+    ctx: typer.Context,
     key: str = typer.Argument(..., help="Dot key, e.g. agent.backend, telegram.allowed_user_ids"),
     value: str = typer.Argument(..., help="Value (use comma for list IDs)."),
 ) -> None:
     """Set config key and save to file."""
-    path = get_config_file_path()
-    cfg = load_config()
+    cf = _config_file_from_ctx(ctx)
+    path = cf if cf else get_config_file_path()
+    cfg = load_config(cf)
     coerced = coerce_config_value(key, value)
     _set_nested(cfg, key, coerced)
     saved = save_config(cfg, path)
@@ -260,6 +293,29 @@ def config_path_legacy() -> None:
     """Print default config file path (deprecated: use 'openab config path')."""
     p = get_config_path()
     typer.echo(str(p))
+
+
+allowlist_app = typer.Typer(help=cli_t("allowlist_add_help"))
+app.add_typer(allowlist_app, name="allowlist")
+
+
+@allowlist_app.command("add")
+def allowlist_add(
+    user_id: int = typer.Argument(..., help="User ID to add (Telegram or Discord numeric ID)."),
+    discord: bool = typer.Option(False, "--discord", help="Add to Discord allowlist (default: Telegram)."),
+) -> None:
+    """Add a user ID to the allowlist and save config."""
+    cfg = load_config()
+    key = "discord.allowed_user_ids" if discord else "telegram.allowed_user_ids"
+    current = parse_allowed_user_ids(_get_nested(cfg, key))
+    if user_id in current:
+        typer.echo(f"{user_id} already in allowlist.", err=True)
+        raise typer.Exit(0)
+    new_list = list(current) + [user_id]
+    _set_nested(cfg, key, new_list)
+    save_config(cfg)
+    platform = "Discord" if discord else "Telegram"
+    typer.echo(cli_t("allowlist_add_done", user_id=user_id, platform=platform))
 
 
 def _install_wizard() -> tuple[bool, bool, bool]:
