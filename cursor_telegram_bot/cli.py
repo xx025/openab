@@ -1,4 +1,4 @@
-"""CLI 入口：使用 typer 启动机器人。"""
+"""CLI 入口：使用 typer 启动机器人。界面文案按 LANG 环境变量中英文适配。"""
 from __future__ import annotations
 
 import logging
@@ -9,16 +9,17 @@ import typer
 from dotenv import load_dotenv
 
 from .bot import run_bot
+from .i18n import cli_t
 
 load_dotenv()
 
-cli = typer.Typer(help="Cursor CLI × Telegram 机器人", no_args_is_help=False)
+cli = typer.Typer(help=cli_t("cli_help"), no_args_is_help=False)
 
 
 def _get_token(token: Optional[str]) -> str:
     t = token or __import__("os").environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     if not t:
-        typer.echo("错误: 请设置 TELEGRAM_BOT_TOKEN 或使用 --token 传入。", err=True)
+        typer.echo(cli_t("err_no_token"), err=True)
         raise typer.Exit(1)
     return t
 
@@ -26,32 +27,32 @@ def _get_token(token: Optional[str]) -> str:
 @cli.callback(invoke_without_command=True)
 def _default(
     ctx: typer.Context,
-    token: Optional[str] = typer.Option(None, "--token", "-t", help="Telegram Bot Token"),
-    workspace: Optional[Path] = typer.Option(None, "--workspace", "-w", path_type=Path, help="Cursor Agent 工作目录"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="打印调试日志"),
+    token: Optional[str] = typer.Option(None, "--token", "-t", help=cli_t("opt_token")),
+    workspace: Optional[Path] = typer.Option(None, "--workspace", "-w", path_type=Path, help=cli_t("opt_workspace")),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help=cli_t("opt_verbose")),
 ) -> None:
     if ctx.invoked_subcommand is None:
         ctx.invoke(run, token=token, workspace=workspace, verbose=verbose)
 
 
-@cli.command("run")
+@cli.command("run", help=cli_t("run_help"))
 def run(
-    token: Optional[str] = typer.Option(None, "--token", "-t", help="Telegram Bot Token"),
+    token: Optional[str] = typer.Option(None, "--token", "-t", help=cli_t("opt_token")),
     workspace: Optional[Path] = typer.Option(
         None,
         "--workspace", "-w",
         path_type=Path,
-        help="Cursor Agent 工作目录",
+        help=cli_t("opt_workspace"),
     ),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="打印调试日志"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help=cli_t("opt_verbose")),
 ) -> None:
-    """启动机器人（长轮询）。"""
+    """Run the bot (long polling)."""
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
     t = _get_token(token)
-    typer.echo("正在启动 Cursor × Telegram 机器人（长轮询）…")
+    typer.echo(cli_t("starting"))
     run_bot(t, workspace=workspace)
 
 

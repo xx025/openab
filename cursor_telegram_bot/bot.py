@@ -11,18 +11,12 @@ from telegram import Update
 from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters
 
 from .agent_runner import run_agent_async
+from .i18n import lang_from_telegram, t
 
 logger = logging.getLogger(__name__)
 
 # Telegram 单条消息长度上限
 MAX_MESSAGE_LENGTH = 4096
-
-# 未鉴权用户收到的固定说明（增加鉴权信息）
-UNAUTHORIZED_MESSAGE = (
-    "您没有权限使用此机器人。\n\n"
-    "【增加鉴权】请将你的 Telegram User ID 提供给管理员，由管理员将你的 ID 加入白名单（ALLOWED_USER_IDS）后即可使用。\n\n"
-    "发送 /whoami 可查看你的 User ID。"
-)
 
 
 def _allowed_user_ids() -> Set[int]:
@@ -74,22 +68,23 @@ async def _send_typing_until_done(chat_id: int, context: ContextTypes.DEFAULT_TY
             continue
 
 
+def _user_lang(update: Update) -> str:
+    """从当前用户获取语言：zh / en。"""
+    if update.effective_user and update.effective_user.language_code:
+        return lang_from_telegram(update.effective_user.language_code)
+    return "en"
+
+
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理 /start：欢迎语 + 鉴权状态说明。"""
     if not update.message or not update.effective_user:
         return
     user_id = update.effective_user.id
+    lang = _user_lang(update)
     if _is_user_allowed(user_id):
-        msg = (
-            "你好，这是 Cursor × Telegram 机器人。\n\n"
-            "直接发送任意文字，我会把它交给 Cursor Agent 处理并回复你。\n\n"
-            "输入 /whoami 可查看你的 Telegram User ID。"
-        )
+        msg = t(lang, "start_welcome")
     else:
-        msg = (
-            UNAUTHORIZED_MESSAGE
-            + f"\n\n你的 User ID：<code>{user_id}</code>"
-        )
+        msg = t(lang, "unauthorized") + "\n\n" + t(lang, "your_user_id") + f"<code>{user_id}</code>"
     await update.message.reply_text(msg, parse_mode="HTML")
 
 
@@ -98,30 +93,31 @@ async def cmd_whoami(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not update.message or not update.effective_user:
         return
     user_id = update.effective_user.id
-    username = update.effective_user.username or "(未设置)"
-    status = "已授权" if _is_user_allowed(user_id) else "未授权"
-    await update.message.reply_text(
-        f"你的 Telegram User ID：<code>{user_id}</code>\n"
-        f"用户名：@{username}\n"
-        f"鉴权状态：{status}",
-        parse_mode="HTML",
+    lang = _user_lang(update)
+    raw_username = update.effective_user.username
+    username_display = ("@" + raw_username) if raw_username else t(lang, "username_not_set")
+    status = t(lang, "status_authorized") if _is_user_allowed(user_id) else t(lang, "status_unauthorized")
+    msg = (
+        f"{t(lang, 'whoami_id')}<code>{user_id}</code>\n"
+        f"{t(lang, 'whoami_username')}{username_display}\n"
+        f"{t(lang, 'whoami_status')}{status}"
     )
+    await update.message.reply_text(msg, parse_mode="HTML")
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message or not update.message.text:
         return
     user_id = update.effective_user.id if update.effective_user else 0
+    lang = _user_lang(update)
     if not _is_user_allowed(user_id):
-        await update.message.reply_text(
-            UNAUTHORIZED_MESSAGE + f"\n\n你的 User ID：<code>{user_id}</code>",
-            parse_mode="HTML",
-        )
+        msg = t(lang, "unauthorized") + "\n\n" + t(lang, "your_user_id") + f"<code>{user_id}</code>"
+        await update.message.reply_text(msg, parse_mode="HTML")
         return
 
     prompt = update.message.text.strip()
     if not prompt:
-        await update.message.reply_text("请发送一段文字作为给 Cursor Agent 的提示。")
+        await update.message.reply_text(t(lang, "prompt_empty"))
         return
 
     chat_id = update.effective_chat.id if update.effective_chat else 0
@@ -137,10 +133,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             prompt,
             workspace=workspace_path,
             timeout=timeout,
+            lang=lang,
         )
     except Exception as e:
         logger.exception("agent run error")
-        reply = f"执行出错: {e!s}"
+        reply = t(lang, "agent_error", error=str(e))
     finally:
         done.set()
         typing_task.cancel()

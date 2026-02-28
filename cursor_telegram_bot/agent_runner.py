@@ -7,6 +7,8 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
+from .i18n import t
+
 
 def _find_agent_cmd() -> str:
     cmd = os.environ.get("CURSOR_AGENT_CMD", "agent")
@@ -35,6 +37,7 @@ async def run_agent_async(
     *,
     workspace: Optional[Path] = None,
     timeout: Optional[int] = 300,
+    lang: str = "en",
 ) -> str:
     """
     异步执行 agent --print，便于在 Telegram 机器人中配合 typing 使用。
@@ -64,6 +67,6 @@ async def run_agent_async(
     except asyncio.TimeoutError:
         proc.kill()
         await proc.wait()
-        return "⏱ 执行超时，请缩短问题或稍后重试。"
+        return t(lang, "agent_timeout")
     text = (stdout or b"").decode("utf-8", errors="replace").strip()
-    return text or "（无文本输出）"
+    return text or t(lang, "agent_no_output")
