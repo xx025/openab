@@ -1,0 +1,174 @@
+"""Telegram 机器人：接收消息 → 调用 Cursor Agent → 分片回传。"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+from pathlib import Path
+from typing import Optional, Set
+
+from telegram import Update
+from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters
+
+from .agent_runner import run_agent_async
+
+logger = logging.getLogger(__name__)
+
+# Telegram 单条消息长度上限
+MAX_MESSAGE_LENGTH = 4096
+
+# 未鉴权用户收到的固定说明（增加鉴权信息）
+UNAUTHORIZED_MESSAGE = (
+    "您没有权限使用此机器人。\n\n"
+    "【增加鉴权】请将你的 Telegram User ID 提供给管理员，由管理员将你的 ID 加入白名单（ALLOWED_USER_IDS）后即可使用。\n\n"
+    "发送 /whoami 可查看你的 User ID。"
+)
+
+
+def _allowed_user_ids() -> Set[int]:
+    raw = os.environ.get("ALLOWED_USER_IDS", "").strip()
+    if not raw:
+        return set()
+    return {int(x.strip()) for x in raw.split(",") if x.strip().isdigit()}
+
+
+def _is_auth_enabled() -> bool:
+    """是否启用了白名单鉴权（配置了 ALLOWED_USER_IDS）。"""
+    return len(_allowed_user_ids()) > 0
+
+
+def _is_user_allowed(user_id: int) -> bool:
+    """当前用户是否在白名单内。未启用鉴权时视为允许所有人。"""
+    allowed = _allowed_user_ids()
+    if not allowed:
+        return True
+    return user_id in allowed
+
+
+def _split_message(text: str, max_len: int = MAX_MESSAGE_LENGTH) -> list[str]:
+    chunks = []
+    while text:
+        if len(text) <= max_len:
+            chunks.append(text)
+            break
+        cut = text.rfind("\n", 0, max_len + 1)
+        if cut <= 0:
+            cut = text.rfind(" ", 0, max_len + 1)
+        if cut <= 0:
+            cut = max_len
+        chunks.append(text[:cut].rstrip())
+        text = text[cut:].lstrip()
+    return chunks
+
+
+async def _send_typing_until_done(chat_id: int, context: ContextTypes.DEFAULT_TYPE, done: asyncio.Event) -> None:
+    """在 done 被 set 之前，每隔几秒发送一次“正在输入”。"""
+    while not done.is_set():
+        try:
+            await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+        except Exception as e:
+            logger.debug("send_chat_action: %s", e)
+        try:
+            await asyncio.wait_for(done.wait(), timeout=4.0)
+        except asyncio.TimeoutError:
+            continue
+
+
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """处理 /start：欢迎语 + 鉴权状态说明。"""
+    if not update.message or not update.effective_user:
+        return
+    user_id = update.effective_user.id
+    if _is_user_allowed(user_id):
+        msg = (
+            "你好，这是 Cursor × Telegram 机器人。\n\n"
+            "直接发送任意文字，我会把它交给 Cursor Agent 处理并回复你。\n\n"
+            "输入 /whoami 可查看你的 Telegram User ID。"
+        )
+    else:
+        msg = (
+            UNAUTHORIZED_MESSAGE
+            + f"\n\n你的 User ID：<code>{user_id}</code>"
+        )
+    await update.message.reply_text(msg, parse_mode="HTML")
+
+
+async def cmd_whoami(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """处理 /whoami：返回当前用户的 Telegram User ID（便于管理员加白名单）。"""
+    if not update.message or not update.effective_user:
+        return
+    user_id = update.effective_user.id
+    username = update.effective_user.username or "(未设置)"
+    status = "已授权" if _is_user_allowed(user_id) else "未授权"
+    await update.message.reply_text(
+        f"你的 Telegram User ID：<code>{user_id}</code>\n"
+        f"用户名：@{username}\n"
+        f"鉴权状态：{status}",
+        parse_mode="HTML",
+    )
+
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message or not update.message.text:
+        return
+    user_id = update.effective_user.id if update.effective_user else 0
+    if not _is_user_allowed(user_id):
+        await update.message.reply_text(
+            UNAUTHORIZED_MESSAGE + f"\n\n你的 User ID：<code>{user_id}</code>",
+            parse_mode="HTML",
+        )
+        return
+
+    prompt = update.message.text.strip()
+    if not prompt:
+        await update.message.reply_text("请发送一段文字作为给 Cursor Agent 的提示。")
+        return
+
+    chat_id = update.effective_chat.id if update.effective_chat else 0
+    done = asyncio.Event()
+    typing_task = asyncio.create_task(_send_typing_until_done(chat_id, context, done))
+
+    workspace = os.environ.get("CURSOR_WORKSPACE")
+    workspace_path = Path(workspace).resolve() if workspace else None
+    timeout = int(os.environ.get("CURSOR_AGENT_TIMEOUT", "300"))
+
+    try:
+        reply = await run_agent_async(
+            prompt,
+            workspace=workspace_path,
+            timeout=timeout,
+        )
+    except Exception as e:
+        logger.exception("agent run error")
+        reply = f"执行出错: {e!s}"
+    finally:
+        done.set()
+        typing_task.cancel()
+        try:
+            await typing_task
+        except asyncio.CancelledError:
+            pass
+
+    chunks = _split_message(reply)
+    for i, chunk in enumerate(chunks):
+        await update.message.reply_text(chunk)
+
+
+def build_application(token: str) -> Application:
+    app = Application.builder().token(token).build()
+    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("whoami", cmd_whoami))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    return app
+
+
+def run_bot(
+    token: str,
+    *,
+    workspace: Optional[Path] = None,
+) -> None:
+    """阻塞运行机器人（长轮询）。"""
+    if workspace is not None:
+        os.environ["CURSOR_WORKSPACE"] = str(workspace)
+    app = build_application(token)
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
