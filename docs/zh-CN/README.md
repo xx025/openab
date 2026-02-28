@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="../assets/icon.png" width="256" alt="OpenAB" />
+  <img src="../../assets/icon.png" width="256" alt="OpenAB" />
 </p>
 
 # OpenAB
 
 **Open Agent Bridge（开放智能体桥接）** — 将智能体（Cursor、Codex、Gemini、Claude、OpenClaw）与聊天平台连接。一份配置、一座桥。
 
-[English](../README.md) · [配置与使用说明](guide.md)
+[English](../../README.md) · [配置与使用说明](guide.md)
 
 ---
 
@@ -29,7 +29,7 @@ pip install openab
 # 或：uv tool install openab
 ```
 
-**2. 配置** — 在 `~/.config/openab/` 下放一份 YAML/JSON 配置（参考 [config.example.yaml](../config.example.yaml)）。至少需要机器人 token 和用户 ID 白名单。完整选项见 [配置与使用说明](guide.md)。
+**2. 配置** — 在 `~/.config/openab/` 下放一份 YAML/JSON 配置（参考 [config.example.yaml](../../config.example.yaml)）。至少需要机器人 token 和用户 ID 白名单。完整选项见 [配置与使用说明](guide.md)。
 
 **3. 运行**
 
@@ -50,4 +50,4 @@ openab run-discord  # 如 Discord
 
 ## 许可证
 
-MIT — [LICENSE](../LICENSE)
+MIT — [LICENSE](../../LICENSE)

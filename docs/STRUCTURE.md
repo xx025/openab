@@ -8,7 +8,10 @@ openab/                    # 主包
 ├── __main__.py            # python -m openab 入口
 ├── core/                  # 公共能力
 │   ├── __init__.py
-│   └── i18n.py            # 中英文文案
+│   └── i18n/              # 中英文文案（按用途分文件）
+│       ├── __init__.py    # t, cli_t, lang_from_*
+│       ├── bot.py         # 机器人端文案 MESSAGES
+│       └── cli.py         # CLI 文案 CLI_MESSAGES
 ├── agents/                # 智能体后端（按 OPENAB_AGENT 选择）
 │   ├── __init__.py        # run_agent_async, run_agent, get_backend
 │   ├── cursor.py          # Cursor CLI
@@ -24,10 +27,14 @@ openab/                    # 主包
     ├── __init__.py
     └── main.py            # typer: openab run, (未来: config, agent, …)
 
-docs/                      # 文档
+docs/                      # 文档（按语言分目录）
 ├── README.md              # 文档索引
-├── README.zh-CN.md        # 中文说明
-└── STRUCTURE.md           # 本文件
+├── STRUCTURE.md           # 本文件
+├── en/                    # 英文
+│   └── guide.md           # 配置与使用说明
+└── zh-CN/                 # 简体中文
+    ├── README.md          # 中文说明
+    └── guide.md           # 配置与使用说明
 
 .env.example
 uv.lock

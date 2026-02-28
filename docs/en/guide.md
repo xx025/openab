@@ -2,13 +2,19 @@
 
 Technical reference for configuration, agent backends, commands, and security. Chat frontends currently include Telegram and Discord; more platforms may be added.
 
+[中文](../zh-CN/guide.md) · **English**
+
+---
+
+**Platforms:** OpenAB runs on **Linux** and **macOS**. All CLI commands (`openab run`, `openab run-discord`, `openab config`, agent backends) work on both. The **install-service** command (systemd user unit) is **Linux-only**; on macOS run the bot directly with `openab run` or `openab run-discord`.
+
 ---
 
 ## Configuration
 
 OpenAB uses a **YAML or JSON** config file. Default path: `~/.config/openab/config.yaml`. Override with environment variable **`OPENAB_CONFIG`**.
 
-Create `~/.config/openab/` and copy the repo’s [config.example.yaml](../config.example.yaml) or [config.example.json](../config.example.json) as `config.yaml` or `config.json`. You can also edit the config from the CLI:
+Create `~/.config/openab/` and copy the repo’s [config.example.yaml](../../config.example.yaml) or [config.example.json](../../config.example.json) as `config.yaml` or `config.json`. You can also edit the config from the CLI:
 
 | Command | Description |
 |---------|-------------|
@@ -30,7 +36,7 @@ New keys are written to the existing config file (YAML or JSON by path); if no f
 | `agent.workspace` | No | Agent working directory (default: **user home** `~`) |
 | `agent.timeout` | No | Timeout in seconds (default: 300) |
 | `cursor.cmd`, `codex.cmd`, `gemini.cmd`, `claude.cmd`, `openclaw.cmd` | No | CLI binary name for each backend |
-| Backend-specific options | No | e.g. `openclaw.thinking` (off \| minimal \| low \| medium \| high \| xhigh), `claude.model`, `codex.skip_git_check`, etc. See [config.example.yaml](../config.example.yaml). |
+| Backend-specific options | No | e.g. `openclaw.thinking` (off \| minimal \| low \| medium \| high \| xhigh), `claude.model`, `codex.skip_git_check`, etc. See [config.example.yaml](../../config.example.yaml). |
 
 ---
 
@@ -55,7 +61,7 @@ New keys are written to the existing config file (YAML or JSON by path); if no f
 | `openab config path` | Print config file path |
 | `openab config get [key]` | Show config or value at key |
 | `openab config set <key> <value>` | Set config key and save |
-| `openab install-service` | Install as a **Linux user-level systemd service** (optional: `--discord` for Discord, `--start` to start now). Linux only. |
+| `openab install-service` | Install as a **Linux user-level systemd service** (optional: `--discord` for Discord, `--start` to start now). **Linux only.** On macOS run `openab run` or `openab run-discord` in the terminal (or configure launchd yourself). |
 
 Options: `--token`, `--workspace`, `--verbose` (e.g. `openab --token "..." --workspace /path/to/dir`).
 
@@ -81,7 +87,7 @@ Any other message is sent to the agent (DM or channel where the bot can read).
 
 ## Auth & security
 
-- Only users listed in `telegram.allowed_user_ids` or `discord.allowed_user_ids` can send prompts; others get an “unauthorized” message.
+- Only users listed in `telegram.allowed_user_ids` or `discord.allowed_user_ids` can send prompts; others get an "unauthorized" message.
 - Do not commit config files that contain tokens. Keep `~/.config/openab/config.yaml` (or your `OPENAB_CONFIG` path) private.
 
 ---

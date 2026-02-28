@@ -23,6 +23,7 @@ from openab.core.config import (
     _get_nested,
     _set_nested,
 )
+from openab.core.detect_cli import BACKEND_CLI_NAMES, detect_available_backends
 from openab.core.i18n import cli_t
 
 load_dotenv()
@@ -48,6 +49,35 @@ def _ask_save_config() -> bool:
         return ans not in ("n", "no")
     except (EOFError, KeyboardInterrupt):
         return False
+
+
+def _ensure_agent_backend(config: dict) -> dict:
+    """若未配置 agent.backend 且当前在交互环境，检测可用后端并引导选择，可选保存。返回可能已修改的 config。"""
+    if not _is_interactive():
+        return config
+    available = detect_available_backends()
+    if not available:
+        return config
+    current = str((config.get("agent") or {}).get("backend") or "cursor").strip().lower()
+    backend_ids = [b[0] for b in available]
+    if current in backend_ids:
+        return config
+    cmd_by_backend = dict(BACKEND_CLI_NAMES)
+    typer.echo("")
+    typer.echo(cli_t("run_backends_detected"))
+    for i, (bid, _) in enumerate(available, 1):
+        typer.echo(f"  {i}) {bid} ({cmd_by_backend.get(bid, bid)})")
+    try:
+        raw = input(cli_t("run_backend_prompt", n=len(available))).strip() or "1"
+        idx = int(raw)
+        if 1 <= idx <= len(available):
+            _set_nested(config, "agent.backend", available[idx - 1][0])
+            if _ask_save_config():
+                get_config_path().parent.mkdir(parents=True, exist_ok=True)
+                save_config(config)
+    except (ValueError, EOFError, KeyboardInterrupt):
+        pass
+    return config
 
 
 def _ensure_telegram_run_config(
@@ -141,6 +171,7 @@ def run(
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
     config = load_config()
+    config = _ensure_agent_backend(config)
     t, allowed, config = _ensure_telegram_run_config(config, token)
     ws = _get_workspace(config, workspace)
     timeout = (config.get("agent") or {}).get("timeout")
@@ -167,6 +198,7 @@ def run_discord(
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
     config = load_config()
+    config = _ensure_agent_backend(config)
     t, allowed, config = _ensure_discord_run_config(config, token)
     ws = _get_workspace(config, workspace)
     timeout = (config.get("agent") or {}).get("timeout")
@@ -249,6 +281,32 @@ def _install_wizard() -> tuple[bool, bool, bool]:
     config_path.parent.mkdir(parents=True, exist_ok=True)
     changed = False
 
+    # 检测并引导选择 agent 后端
+    available = detect_available_backends()
+    cmd_by_backend = dict(BACKEND_CLI_NAMES)
+    current_backend = (config.get("agent") or {}).get("backend") or "cursor"
+    current_backend = str(current_backend).strip().lower()
+    if available:
+        typer.echo("")
+        typer.echo(cli_t("install_wizard_backends_detected"))
+        for i, (bid, _) in enumerate(available, 1):
+            cmd = cmd_by_backend.get(bid, bid)
+            typer.echo(f"  {i}) {bid} ({cmd})")
+        backend_ids = [b[0] for b in available]
+        if current_backend not in backend_ids:
+            try:
+                raw = input(cli_t("install_wizard_backend_prompt", n=len(available))).strip() or "1"
+                idx = int(raw)
+                if 1 <= idx <= len(available):
+                    current_backend = available[idx - 1][0]
+                    _set_nested(config, "agent.backend", current_backend)
+                    changed = True
+            except (ValueError, EOFError, KeyboardInterrupt):
+                pass
+    else:
+        typer.echo("")
+        typer.echo(cli_t("install_wizard_backend_none"))
+
     if install_telegram:
         tg = config.setdefault("telegram", {})
         if not (tg.get("bot_token") or "").strip():
@@ -319,6 +377,8 @@ def install_service(
     except RuntimeError as e:
         if "only supported on Linux" in str(e):
             typer.echo(cli_t("install_service_linux_only"), err=True)
+            if sys.platform == "darwin":
+                typer.echo(cli_t("install_service_mac_hint"), err=True)
         else:
             typer.echo(str(e), err=True)
         raise typer.Exit(1)

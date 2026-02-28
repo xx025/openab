@@ -25,10 +25,15 @@ def _find_openab_executable() -> tuple[str, list[str]]:
     return (sys.executable, ["-m", "openab"])
 
 
+def _escape_exec_start_arg(s: str) -> str:
+    """systemd ExecStart 参数中空格需反斜杠转义。"""
+    return s.replace("\\", "\\\\").replace(" ", "\\ ")
+
+
 def _write_unit_file(path: Path, exec_start: list[str], description: str) -> None:
     """写入 systemd unit 文件。exec_start 为 [exe, arg1, arg2, ...]。"""
-    # ExecStart 格式：第一个是程序，其余为参数；空格用 \ 转义或直接空格
-    start_line = " ".join(exec_start)
+    # ExecStart 格式：参数内空格用 \ 转义（Linux/Mac 路径兼容）
+    start_line = " ".join(_escape_exec_start_arg(a) for a in exec_start)
     content = f"""[Unit]
 Description={description}
 After=network-online.target
