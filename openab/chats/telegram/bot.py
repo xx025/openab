@@ -1,4 +1,4 @@
-"""Telegram 机器人：接收消息 → 调用 Cursor Agent → 分片回传。"""
+"""Telegram bot: receive messages → call agent → reply (chunked)."""
 from __future__ import annotations
 
 import asyncio
@@ -10,12 +10,11 @@ from typing import Optional, Set
 from telegram import Update
 from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters
 
-from .agent_runner import run_agent_async
-from .i18n import lang_from_telegram, t
+from openab.agents import run_agent_async
+from openab.core.i18n import lang_from_telegram, t
 
 logger = logging.getLogger(__name__)
 
-# Telegram 单条消息长度上限
 MAX_MESSAGE_LENGTH = 4096
 
 
@@ -27,12 +26,10 @@ def _allowed_user_ids() -> Set[int]:
 
 
 def _is_auth_enabled() -> bool:
-    """是否启用了白名单鉴权（配置了 ALLOWED_USER_IDS）。"""
     return len(_allowed_user_ids()) > 0
 
 
 def _is_user_allowed(user_id: int) -> bool:
-    """当前用户是否在白名单内。未配置白名单时不允许任何人使用。"""
     allowed = _allowed_user_ids()
     if not allowed:
         return False
@@ -56,7 +53,6 @@ def _split_message(text: str, max_len: int = MAX_MESSAGE_LENGTH) -> list[str]:
 
 
 async def _send_typing_until_done(chat_id: int, context: ContextTypes.DEFAULT_TYPE, done: asyncio.Event) -> None:
-    """在 done 被 set 之前，每隔几秒发送一次“正在输入”。"""
     while not done.is_set():
         try:
             await context.bot.send_chat_action(chat_id=chat_id, action="typing")
@@ -69,14 +65,12 @@ async def _send_typing_until_done(chat_id: int, context: ContextTypes.DEFAULT_TY
 
 
 def _user_lang(update: Update) -> str:
-    """从当前用户获取语言：zh / en。"""
     if update.effective_user and update.effective_user.language_code:
         return lang_from_telegram(update.effective_user.language_code)
     return "en"
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """处理 /start：欢迎语 + 鉴权状态说明。"""
     if not update.message or not update.effective_user:
         return
     user_id = update.effective_user.id
@@ -90,7 +84,6 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_whoami(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """处理 /whoami：返回当前用户的 Telegram User ID（便于管理员加白名单）。"""
     if not update.message or not update.effective_user:
         return
     user_id = update.effective_user.id
@@ -126,9 +119,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     done = asyncio.Event()
     typing_task = asyncio.create_task(_send_typing_until_done(chat_id, context, done))
 
-    workspace = os.environ.get("CURSOR_WORKSPACE")
+    workspace = os.environ.get("OPENAB_WORKSPACE") or os.environ.get("CURSOR_WORKSPACE")
     workspace_path = Path(workspace).resolve() if workspace else None
-    timeout = int(os.environ.get("CURSOR_AGENT_TIMEOUT", "300"))
+    timeout = int(os.environ.get("OPENAB_AGENT_TIMEOUT") or os.environ.get("CURSOR_AGENT_TIMEOUT", "300"))
 
     try:
         reply = await run_agent_async(
@@ -148,8 +141,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         except asyncio.CancelledError:
             pass
 
-    chunks = _split_message(reply)
-    for i, chunk in enumerate(chunks):
+    for chunk in _split_message(reply):
         await update.message.reply_text(chunk)
 
 
@@ -166,8 +158,7 @@ def run_bot(
     *,
     workspace: Optional[Path] = None,
 ) -> None:
-    """阻塞运行机器人（长轮询）。"""
     if workspace is not None:
-        os.environ["CURSOR_WORKSPACE"] = str(workspace)
+        os.environ["OPENAB_WORKSPACE"] = str(workspace)
     app = build_application(token)
     app.run_polling(allowed_updates=Update.ALL_TYPES)

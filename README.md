@@ -1,4 +1,4 @@
-**中文说明 / Chinese:** [README.zh-CN.md](README.zh-CN.md)
+**中文说明 / Chinese:** [docs/README.zh-CN.md](docs/README.zh-CN.md)
 
 ---
 
@@ -8,35 +8,40 @@
 
 | Agents (backends) | Chats (frontends) |
 |-------------------|-------------------|
-| Cursor CLI ✓      | Telegram ✓        |
-| _more planned_    | _more planned_    |
+| [Cursor](https://cursor.com) CLI ✓ | Telegram ✓        |
+| [OpenAI Codex](https://github.com/openai/codex) ✓ | _more planned_    |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) ✓ |                   |
+| Claude CLI ✓      |                   |
+| _more planned_    |                   |
 
 ---
 
 ## Quick start: Agent × Telegram
 
-The steps below run **one** built-in combination: one agent backend (Cursor CLI) and Telegram. Other combinations will be added later.
+The steps below run **one** built-in combination: one agent backend (Cursor or Codex) and Telegram.
 
 ### Requirements
 
-1. **Cursor Agent CLI** installed and logged in  
-   ```bash
-   agent status   # check login
-   agent login    # if not logged in
-   ```
+1. **One agent CLI** installed and signed in:
+   - **Cursor:** `agent status` / `agent login`
+   - **Codex:** `npm i -g @openai/codex` or `brew install --cask codex`, then `codex` (or `CODEX_API_KEY`)
+   - **Gemini:** `npm i -g @google/gemini-cli` or `brew install gemini-cli`, then `gemini` (or `GEMINI_API_KEY`)
+   - **Claude:** use a CLI that supports `claude -p "prompt"` and set `OPENAB_AGENT=claude`, `CLAUDE_CLI_CMD` to the binary
 
 2. **Telegram Bot Token**  
    Create a bot via [@BotFather](https://t.me/BotFather) and get the token.
 
-3. **Python 3.10+**
+3. **[uv](https://docs.astral.sh/uv/)**（推荐）或 Python 3.10+
 
 ### Install
 
 ```bash
 git clone https://github.com/xx025/openab.git
 cd openab
-pip install -r requirements.txt
+uv sync
 ```
+
+（uv 会按 `.python-version` 创建虚拟环境并安装依赖；首次可先安装 [uv](https://docs.astral.sh/uv/)。）
 
 ### Configuration
 
@@ -51,18 +56,21 @@ cp .env.example .env
 |----------|----------|-------------|
 | `TELEGRAM_BOT_TOKEN` | Yes | Bot token from BotFather |
 | `ALLOWED_USER_IDS` | Yes | Comma-separated Telegram user IDs. **If unset, no one can use the bot.** Users can send `/whoami` to get their ID. |
-| `CURSOR_AGENT_CMD` | No | Path to `agent` (default: `agent` in PATH) |
-| `CURSOR_WORKSPACE` | No | Working directory for the agent (default: current dir) |
-| `CURSOR_AGENT_TIMEOUT` | No | Timeout in seconds (default: 300) |
+| `OPENAB_AGENT` | No | Agent backend: `cursor` (default), `codex`, `gemini`, or `claude` |
+| `OPENAB_WORKSPACE` | No | Working directory for the agent (default: current dir). `CURSOR_WORKSPACE` is also accepted. |
+| `OPENAB_AGENT_TIMEOUT` | No | Timeout in seconds (default: 300) |
+| `CURSOR_AGENT_CMD` | No | Path to Cursor `agent` (default: `agent` in PATH) |
+| `CODEX_CMD` | No | Path to Codex CLI (default: `codex` in PATH). Uses `codex exec` non-interactively. |
+| `CODEX_SKIP_GIT_CHECK` | No | Set to `1` to run Codex outside a Git repo |
+| `GEMINI_CLI_CMD` | No | Path to Gemini CLI (default: `gemini` in PATH). Uses `gemini -p "prompt"`. |
+| `CLAUDE_CLI_CMD` | No | Path to Claude CLI (default: `claude` in PATH). Uses `claude -p "prompt"`. |
 
 ### Run
 
 ```bash
-# Long polling (no public URL needed)
-python -m cursor_telegram_bot
-
+uv run openab
 # Or with options
-python -m cursor_telegram_bot --token "YOUR_BOT_TOKEN" --workspace /path/to/project
+uv run openab --token "YOUR_BOT_TOKEN" --workspace /path/to/project
 ```
 
 Open your bot in Telegram and send text; OpenAB forwards it to the configured agent and replies (long replies are split into multiple messages).

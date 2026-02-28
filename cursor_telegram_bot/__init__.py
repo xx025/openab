@@ -1,1 +1,1 @@
-# Cursor CLI × Telegram Bot
+# Compatibility package: use openab. See docs/STRUCTURE.md.

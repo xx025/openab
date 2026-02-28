@@ -12,8 +12,8 @@ MESSAGES = {
             "发送 /whoami 可查看你的 User ID。"
         ),
         "start_welcome": (
-            "你好，这是 Cursor × Telegram 机器人。\n\n"
-            "直接发送任意文字，我会把它交给 Cursor Agent 处理并回复你。\n\n"
+            "你好，这是 OpenAB 机器人。\n\n"
+            "直接发送任意文字，我会把它交给已配置的智能体处理并回复你。\n\n"
             "输入 /whoami 可查看你的 Telegram User ID。"
         ),
         "your_user_id": "你的 User ID：",
@@ -23,7 +23,7 @@ MESSAGES = {
         "status_authorized": "已授权",
         "status_unauthorized": "未授权",
         "username_not_set": "(未设置)",
-        "prompt_empty": "请发送一段文字作为给 Cursor Agent 的提示。",
+        "prompt_empty": "请发送一段文字作为给智能体的提示。",
         "agent_error": "执行出错：{error}",
         "agent_timeout": "⏱ 执行超时，请缩短问题或稍后重试。",
         "agent_no_output": "（无文本输出）",
@@ -39,8 +39,8 @@ MESSAGES = {
             "Send /whoami to see your User ID."
         ),
         "start_welcome": (
-            "Hi, this is the Cursor × Telegram bot.\n\n"
-            "Send any text and I'll pass it to Cursor Agent and reply with the result.\n\n"
+            "Hi, this is the OpenAB bot.\n\n"
+            "Send any text and I'll pass it to the configured agent and reply with the result.\n\n"
             "Send /whoami to see your Telegram User ID."
         ),
         "your_user_id": "Your User ID: ",
@@ -50,7 +50,7 @@ MESSAGES = {
         "status_authorized": "Authorized",
         "status_unauthorized": "Not authorized",
         "username_not_set": "(not set)",
-        "prompt_empty": "Please send some text as the prompt for Cursor Agent.",
+        "prompt_empty": "Please send some text as the prompt for the agent.",
         "agent_error": "Error: {error}",
         "agent_timeout": "⏱ Request timed out. Try a shorter prompt or try again later.",
         "agent_no_output": "(no text output)",
@@ -64,22 +64,22 @@ MESSAGES = {
 # CLI 文案（按 LANG 环境变量）
 CLI_MESSAGES = {
     "zh": {
-        "cli_help": "Cursor CLI × Telegram 机器人",
+        "cli_help": "OpenAB — 开放智能体桥接",
         "opt_token": "Telegram Bot Token",
-        "opt_workspace": "Cursor Agent 工作目录",
+        "opt_workspace": "智能体工作目录",
         "opt_verbose": "打印调试日志",
-        "run_help": "启动机器人（长轮询）。",
+        "run_help": "启动 Telegram 机器人（长轮询）。",
         "err_no_token": "错误: 请设置 TELEGRAM_BOT_TOKEN 或使用 --token 传入。",
-        "starting": "正在启动 Cursor × Telegram 机器人（长轮询）…",
+        "starting": "正在启动 OpenAB Telegram 机器人（长轮询）…",
     },
     "en": {
-        "cli_help": "Cursor CLI × Telegram Bot",
+        "cli_help": "OpenAB — Open Agent Bridge",
         "opt_token": "Telegram Bot Token",
-        "opt_workspace": "Cursor Agent workspace directory",
+        "opt_workspace": "Agent workspace directory",
         "opt_verbose": "Enable verbose logging",
-        "run_help": "Run the bot (long polling).",
+        "run_help": "Run Telegram bot (long polling).",
         "err_no_token": "Error: Set TELEGRAM_BOT_TOKEN or pass --token.",
-        "starting": "Starting Cursor × Telegram bot (long polling)…",
+        "starting": "Starting OpenAB Telegram bot (long polling)…",
     },
 }
 
