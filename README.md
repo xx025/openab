@@ -1,8 +1,8 @@
-# OpenAB
-
 <p align="center">
-  <img src="assets/icon.png" width="128" alt="OpenAB" />
+  <img src="assets/icon.png" width="256" alt="OpenAB" />
 </p>
+
+# OpenAB
 
 **Open Agent Bridge** — Connect AI agents (Cursor, Codex, Gemini, Claude, OpenClaw) to chat platforms. One config, one bridge.
 

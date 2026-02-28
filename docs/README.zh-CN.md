@@ -1,8 +1,8 @@
-# OpenAB
-
 <p align="center">
-  <img src="../assets/icon.png" width="128" alt="OpenAB" />
+  <img src="../assets/icon.png" width="256" alt="OpenAB" />
 </p>
+
+# OpenAB
 
 **Open Agent Bridge（开放智能体桥接）** — 将智能体（Cursor、Codex、Gemini、Claude、OpenClaw）与聊天平台连接。一份配置、一座桥。
 

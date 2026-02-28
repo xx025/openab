@@ -23,9 +23,10 @@ jobs:
         uses: astral-sh/setup-uv@v4
         with:
           version: "latest"
+          python-version: "3.10"
 
       - name: Set up Python
-        run: uv python install
+        run: uv python install 3.10
 
       - name: Install dependencies and build
         run: uv sync --extra dev

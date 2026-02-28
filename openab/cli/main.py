@@ -11,10 +11,15 @@ from dotenv import load_dotenv
 from openab.chats.discord import run_bot as run_discord_bot
 from openab.chats.telegram import run_bot as run_telegram_bot
 from openab.core.config import (
+    coerce_config_value,
     get_config_path,
+    get_config_file_path,
     load_config,
     parse_allowed_user_ids,
     resolve_workspace,
+    save_config,
+    _get_nested,
+    _set_nested,
 )
 from openab.core.i18n import cli_t
 
@@ -114,8 +119,50 @@ def run_discord(
     )
 
 
+config_app = typer.Typer(help="Read or write config file (YAML/JSON).")
+app.add_typer(config_app, name="config")
+
+
+@config_app.command("path")
+def config_path_cmd() -> None:
+    """Print config file path (current or default)."""
+    typer.echo(str(get_config_file_path()))
+
+
+@config_app.command("get")
+def config_get(key: Optional[str] = typer.Argument(None, help="Dot key, e.g. agent.backend (omit to show all).")) -> None:
+    """Show config or value at key."""
+    cfg = load_config()
+    if not key:
+        import json
+        typer.echo(json.dumps(cfg, indent=2, ensure_ascii=False))
+        return
+    val = _get_nested(cfg, key)
+    if val is None:
+        raise typer.Exit(1)
+    if isinstance(val, (list, dict)):
+        import json
+        typer.echo(json.dumps(val, indent=2, ensure_ascii=False))
+    else:
+        typer.echo(val)
+
+
+@config_app.command("set")
+def config_set(
+    key: str = typer.Argument(..., help="Dot key, e.g. agent.backend, telegram.allowed_user_ids"),
+    value: str = typer.Argument(..., help="Value (use comma for list IDs)."),
+) -> None:
+    """Set config key and save to file."""
+    path = get_config_file_path()
+    cfg = load_config()
+    coerced = coerce_config_value(key, value)
+    _set_nested(cfg, key, coerced)
+    saved = save_config(cfg, path)
+    typer.echo(f"Saved to {saved}")
+
+
 @app.command("config-path")
-def config_path() -> None:
-    """打印默认配置文件路径（YAML 或 JSON）。"""
+def config_path_legacy() -> None:
+    """Print default config file path (deprecated: use 'openab config path')."""
     p = get_config_path()
     typer.echo(str(p))

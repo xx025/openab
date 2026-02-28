@@ -6,9 +6,17 @@ Technical reference for configuration, agent backends, commands, and security. C
 
 ## Configuration
 
-OpenAB uses a **YAML or JSON** config file. Default path: `~/.config/openab/config.yaml` (run `openab config-path` to print). Override with environment variable **`OPENAB_CONFIG`**.
+OpenAB uses a **YAML or JSON** config file. Default path: `~/.config/openab/config.yaml`. Override with environment variable **`OPENAB_CONFIG`**.
 
-Create `~/.config/openab/` and copy the repo’s [config.example.yaml](../config.example.yaml) or [config.example.json](../config.example.json) as `config.yaml` or `config.json`.
+Create `~/.config/openab/` and copy the repo’s [config.example.yaml](../config.example.yaml) or [config.example.json](../config.example.json) as `config.yaml` or `config.json`. You can also edit the config from the CLI:
+
+| Command | Description |
+|---------|-------------|
+| `openab config path` | Print config file path (current or default) |
+| `openab config get [key]` | Show full config or value at dot key (e.g. `agent.backend`) |
+| `openab config set <key> <value>` | Set key and save (e.g. `openab config set agent.backend openclaw`; use comma for list IDs: `openab config set telegram.allowed_user_ids "123,456"`) |
+
+New keys are written to the existing config file (YAML or JSON by path); if no file exists, the default path is used and created on first `set`.
 
 ### Configuration reference
 
@@ -44,7 +52,9 @@ Create `~/.config/openab/` and copy the repo’s [config.example.yaml](../config
 |---------|-------------|
 | `openab` / `openab run` | Run Telegram bot |
 | `openab run-discord` | Run Discord bot |
-| `openab config-path` | Print default config file path |
+| `openab config path` | Print config file path |
+| `openab config get [key]` | Show config or value at key |
+| `openab config set <key> <value>` | Set config key and save |
 
 Options: `--token`, `--workspace`, `--verbose` (e.g. `openab --token "..." --workspace /path/to/dir`).
 

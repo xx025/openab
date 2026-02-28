@@ -85,3 +85,68 @@ def parse_allowed_user_ids(raw: Any) -> frozenset[int]:
             int(x.strip()) for x in raw.split(",") if x.strip().isdigit()
         )
     return frozenset()
+
+
+def get_config_file_path() -> Path:
+    """当前使用的配置文件路径；不存在时返回默认路径（用于新建）。"""
+    path = _find_config_file()
+    if path:
+        return path
+    return get_config_path()
+
+
+def _get_nested(data: dict[str, Any], key: str) -> Any:
+    """点号键如 agent.backend 取嵌套值。"""
+    keys = key.strip().split(".")
+    cur: Any = data
+    for k in keys:
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(k)
+    return cur
+
+
+def _set_nested(data: dict[str, Any], key: str, value: Any) -> None:
+    """点号键如 agent.backend 写嵌套值，自动创建中间 dict。"""
+    keys = key.strip().split(".")
+    cur = data
+    for k in keys[:-1]:
+        if k not in cur or not isinstance(cur[k], dict):
+            cur[k] = {}
+        cur = cur[k]
+    cur[keys[-1]] = value
+
+
+# 需要转为整数的键
+_INT_KEYS = frozenset({"agent.timeout"})
+# 需要转为整数组的键（逗号分隔字符串 -> list[int]）
+_LIST_INT_KEYS = frozenset({"telegram.allowed_user_ids", "discord.allowed_user_ids"})
+
+
+def coerce_config_value(key: str, raw: str) -> Any:
+    """根据键名将字符串转为合适类型。"""
+    if key in _LIST_INT_KEYS:
+        return [int(x.strip()) for x in raw.split(",") if x.strip().isdigit()]
+    if key in _INT_KEYS:
+        try:
+            return int(raw.strip())
+        except ValueError:
+            return raw.strip()
+    return raw.strip()
+
+
+def save_config(config: dict[str, Any], path: Path | None = None) -> Path:
+    """将配置写回 YAML 或 JSON；path 为空时用当前或默认路径，格式按扩展名。"""
+    if path is None:
+        path = _find_config_file() or get_config_path()
+    path = path.expanduser().resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    suf = path.suffix.lower()
+    text: str
+    if suf == ".json":
+        text = json.dumps(config, indent=2, ensure_ascii=False)
+    else:
+        import yaml
+        text = yaml.dump(config, allow_unicode=True, default_flow_style=False, sort_keys=False)
+    path.write_text(text, encoding="utf-8")
+    return path

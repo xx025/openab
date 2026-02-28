@@ -7,7 +7,7 @@ name = "openab"
 version = "0.3.0"
 description = "Open Agent Bridge — connect agent backends (CLIs, APIs) to chat platforms (Telegram, …)."
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
     "python-telegram-bot>=21.0",
