@@ -28,7 +28,7 @@ jobs:
         run: uv python install
 
       - name: Install dependencies and build
-        run: uv sync --group dev
+        run: uv sync --extra dev
 
       - name: Build package
         run: uv run python -m build
