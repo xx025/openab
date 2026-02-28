@@ -7,12 +7,17 @@ import sys
 from pathlib import Path
 from typing import Any, Optional
 
-from telegram import Update
+from telegram import Update, BotCommand
 from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters
 from telegram.error import Conflict
 
 from openab.agents import run_agent_async
 from openab.core.config import load_config, parse_allowed_user_ids, try_add_allowlist_by_api_token
+from openab.core.cursor_session_state import (
+    set_new_session_next,
+    set_resume_id,
+    build_agent_config_with_session,
+)
 from openab.core.i18n import lang_from_telegram, t
 
 logger = logging.getLogger(__name__)
@@ -120,6 +125,53 @@ async def cmd_whoami(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     await update.message.reply_text(msg, parse_mode="HTML")
 
 
+async def cmd_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """创建新会话：下一条消息将在新会话中处理（仅 Cursor 后端生效）。"""
+    if not update.message or not update.effective_user or not update.effective_chat:
+        return
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    lang = _user_lang(update)
+    if not _is_user_allowed(user_id, context):
+        await update.message.reply_text(t(lang, "unauthorized"))
+        return
+    set_new_session_next("tg", chat_id, user_id)
+    await update.message.reply_text(t(lang, "session_new_created"))
+
+
+async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """切换/恢复会话：/resume [会话ID]，不填则恢复为延续上一会话。"""
+    if not update.message or not update.effective_user or not update.effective_chat:
+        return
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    lang = _user_lang(update)
+    if not _is_user_allowed(user_id, context):
+        await update.message.reply_text(t(lang, "unauthorized"))
+        return
+    args = (update.message.text or "").strip().split()
+    # args[0] is /resume, args[1] optional session id
+    session_id = args[1].strip() if len(args) > 1 else None
+    if session_id:
+        set_resume_id("tg", chat_id, user_id, session_id)
+        await update.message.reply_text(t(lang, "session_resume_switched", id=session_id))
+    else:
+        set_resume_id("tg", chat_id, user_id, None)
+        await update.message.reply_text(t(lang, "session_resume_latest"))
+
+
+async def cmd_sessions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """列出会话说明（当前无法在机器人中列出，提示用 /resume <ID>）。"""
+    if not update.message or not update.effective_user:
+        return
+    user_id = update.effective_user.id
+    lang = _user_lang(update)
+    if not _is_user_allowed(user_id, context):
+        await update.message.reply_text(t(lang, "unauthorized"))
+        return
+    await update.message.reply_text(t(lang, "sessions_list_unavailable") + "\n\n" + t(lang, "session_resume_usage"))
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message or not update.message.text:
         return
@@ -148,7 +200,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     workspace: Optional[Path] = context.bot_data.get("openab_workspace")
     timeout: int = context.bot_data.get("openab_timeout", 300)
-    agent_config: Optional[dict[str, Any]] = context.bot_data.get("openab_agent_config")
+    base_agent_config = context.bot_data.get("openab_agent_config") or {}
+    agent_config = build_agent_config_with_session(base_agent_config, "tg", chat_id, user_id)
 
     try:
         reply = await run_agent_async(
@@ -185,6 +238,33 @@ def _error_handler(update: Optional[Update], context: ContextTypes.DEFAULT_TYPE)
     logger.exception("Bot error: %s", err, exc_info=err)
 
 
+# 命令菜单：用户输入 / 时 Telegram 会显示该列表（需通过 set_my_commands 注册）
+TELEGRAM_COMMANDS_EN = [
+    BotCommand("start", "Welcome and auth status"),
+    BotCommand("whoami", "Show your Telegram user ID"),
+    BotCommand("new", "Create new session (next message in new conversation)"),
+    BotCommand("resume", "Resume previous or switch to session: /resume [ID]"),
+    BotCommand("sessions", "How to view and switch sessions"),
+]
+TELEGRAM_COMMANDS_ZH = [
+    BotCommand("start", "欢迎与鉴权状态"),
+    BotCommand("whoami", "查看你的 Telegram 用户 ID"),
+    BotCommand("new", "创建新会话（下一条消息在新会话中）"),
+    BotCommand("resume", "恢复上一会话或切换：/resume [会话ID]"),
+    BotCommand("sessions", "如何查看与切换会话"),
+]
+
+
+async def _post_init_set_commands(application: Application) -> None:
+    """Bot 启动后向 Telegram 注册命令菜单，使输入 / 时显示命令列表。"""
+    bot = application.bot
+    await bot.set_my_commands(TELEGRAM_COMMANDS_EN)
+    try:
+        await bot.set_my_commands(TELEGRAM_COMMANDS_ZH, language_code="zh-hans")
+    except Exception as e:
+        logger.debug("Set commands for zh-hans skipped: %s", e)
+
+
 def build_application(
     token: str,
     *,
@@ -195,7 +275,12 @@ def build_application(
     config_path: Optional[Path] = None,
     agent_config: Optional[dict[str, Any]] = None,
 ) -> Application:
-    app = Application.builder().token(token).build()
+    app = (
+        Application.builder()
+        .token(token)
+        .post_init(_post_init_set_commands)
+        .build()
+    )
     app.bot_data["openab_workspace"] = workspace
     app.bot_data["openab_timeout"] = timeout
     app.bot_data["openab_allowed_user_ids"] = allowed_user_ids
@@ -204,6 +289,9 @@ def build_application(
     app.bot_data["openab_agent_config"] = agent_config or {}
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("whoami", cmd_whoami))
+    app.add_handler(CommandHandler("new", cmd_new))
+    app.add_handler(CommandHandler("resume", cmd_resume))
+    app.add_handler(CommandHandler("sessions", cmd_sessions))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_error_handler(_error_handler)
     return app

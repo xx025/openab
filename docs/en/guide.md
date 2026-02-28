@@ -56,7 +56,7 @@ Run `openab run serve` to expose an HTTP API compatible with OpenAI:
 
 ## Agent backends (prerequisites)
 
-- **Cursor:** Cursor CLI — `agent status` / `agent login`.
+- **Cursor:** Cursor CLI — `agent status` / `agent login`. By default uses `--continue` to resume the previous session; set `cursor.continue_session: false` in config to start a new session each time.
 - **Codex:** `npm i -g @openai/codex` or `brew install --cask codex`; then `codex` or set API key.
 - **Gemini:** `npm i -g @google/gemini-cli` or `brew install gemini-cli`; then `gemini`.
 - **Claude:** CLI that supports `claude -p "prompt"`; set `agent.backend: claude` in config.
@@ -88,6 +88,9 @@ Run `openab run serve` to expose an HTTP API compatible with OpenAI:
 |---------|-------------|
 | `/start` | Welcome and auth status |
 | `/whoami` | Show your Telegram user ID (for allowlist) |
+| `/new` | Create a new session (next message starts a new conversation; Cursor backend only) |
+| `/resume [session ID]` | Omit ID to resume previous session; include ID to switch to that session |
+| `/sessions` | How to view and switch sessions (list sessions in Cursor) |
 
 Any other message is sent to the agent.
 
@@ -97,6 +100,9 @@ Any other message is sent to the agent.
 |---------|-------------|
 | `!start` | Welcome and auth status |
 | `!whoami` | Show your Discord user ID (for allowlist) |
+| `!new` | Create a new session (next message in new conversation; Cursor backend only) |
+| `!resume [session ID]` | Omit ID to resume previous session; include ID to switch to that session |
+| `!sessions` | How to view and switch sessions |
 
 Any other message is sent to the agent (DM or channel where the bot can read).
 

@@ -10,12 +10,26 @@ from typing import Any, Generator, Optional
 
 from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from openab.agents import run_agent_async
 from openab.core.config import load_config, resolve_workspace
 
 logger = logging.getLogger(__name__)
+
+
+def _response_body_single_chunk(body: dict) -> Response:
+    """用单块 StreamingResponse 返回 JSON，避免 ASGI/uvicorn 缓冲导致客户端迟迟收不到响应。"""
+    payload = (json.dumps(body, ensure_ascii=False) + "\n").encode("utf-8")
+    return StreamingResponse(
+        iter([payload]),
+        media_type="application/json",
+        headers={
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Length": str(len(payload)),
+        },
+    )
 
 
 def _prompt_from_messages(messages: list[dict[str, Any]]) -> str:
@@ -172,32 +186,27 @@ def create_app(
                 media_type="text/event-stream",
                 headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
             )
-        return JSONResponse(
-            content={
-                "id": completion_id,
-                "object": "chat.completion",
-                "created": created,
-                "model": model,
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {"role": "assistant", "content": reply},
-                        "finish_reason": "stop",
-                    }
-                ],
-                "usage": {
-                    "prompt_tokens": 0,
-                    "completion_tokens": 0,
-                    "total_tokens": 0,
-                },
-            }
-        )
+        body = {
+            "id": completion_id,
+            "object": "chat.completion",
+            "created": created,
+            "model": model,
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": reply},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        }
+        return _response_body_single_chunk(body)
 
     @app.post("/v1/responses")
     async def responses(
         request: Request,
         authorization: Optional[str] = Header(None, alias="Authorization"),
-    ) -> JSONResponse:
+    ):
         """OpenAI Responses API 兼容：input/instructions → agent → output items。"""
         _check_api_key(api_key, authorization)
         try:
@@ -244,16 +253,15 @@ def create_app(
             "role": "assistant",
             "content": [{"type": "text", "text": reply}],
         }
-        return JSONResponse(
-            content={
-                "id": response_id,
-                "object": "response",
-                "created": created,
-                "model": model,
-                "output": [output_item],
-                "output_text": reply,
-            }
-        )
+        body = {
+            "id": response_id,
+            "object": "response",
+            "created": created,
+            "model": model,
+            "output": [output_item],
+            "output_text": reply,
+        }
+        return _response_body_single_chunk(body)
 
     @app.get("/v1/models")
     async def models(

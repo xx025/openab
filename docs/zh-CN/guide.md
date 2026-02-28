@@ -56,7 +56,7 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 
 ## 智能体后端（前置要求）
 
-- **Cursor：** Cursor CLI — `agent status` / `agent login`。
+- **Cursor：** Cursor CLI — `agent status` / `agent login`。默认带 `--continue` 延续上一会话；在配置中设置 `cursor.continue_session: false` 可改为每次新会话。
 - **Codex：** `npm i -g @openai/codex` 或 `brew install --cask codex`；然后使用 `codex` 或配置 API key。
 - **Gemini：** `npm i -g @google/gemini-cli` 或 `brew install gemini-cli`；然后使用 `gemini`。
 - **Claude：** 支持 `claude -p "prompt"` 的 CLI；在配置中设置 `agent.backend: claude`。
@@ -88,6 +88,9 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 |------|------|
 | `/start` | 欢迎语与鉴权状态 |
 | `/whoami` | 显示你的 Telegram 用户 ID（用于白名单） |
+| `/new` | 创建新会话（下一条消息将在新会话中处理，仅 Cursor 后端） |
+| `/resume [会话ID]` | 不填 ID 则恢复为延续上一会话；填 ID 则切换到该会话 |
+| `/sessions` | 说明如何查看与切换会话（会话列表需在 Cursor 中查看） |
 
 其他消息会转发给智能体。
 
@@ -97,6 +100,9 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 |------|------|
 | `!start` | 欢迎语与鉴权状态 |
 | `!whoami` | 显示你的 Discord 用户 ID（用于白名单） |
+| `!new` | 创建新会话（下一条消息在新会话中处理，仅 Cursor 后端） |
+| `!resume [会话ID]` | 不填 ID 则恢复延续上一会话；填 ID 则切换到该会话 |
+| `!sessions` | 说明如何查看与切换会话 |
 
 其他消息会转发给智能体（私信或机器人可读的频道）。
 

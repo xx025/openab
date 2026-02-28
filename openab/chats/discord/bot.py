@@ -8,9 +8,15 @@ from typing import Any, Optional
 
 import discord
 from discord import Intents
+from discord.ext import commands
 
 from openab.agents import run_agent_async
 from openab.core.config import load_config, parse_allowed_user_ids, try_add_allowlist_by_api_token
+from openab.core.cursor_session_state import (
+    set_new_session_next,
+    set_resume_id,
+    build_agent_config_with_session,
+)
 from openab.core.i18n import lang_from_env, t
 
 logger = logging.getLogger(__name__)
@@ -48,7 +54,7 @@ async def _typing_until_done(channel: discord.abc.Messageable, done: asyncio.Eve
             continue
 
 
-class OpenABDiscordBot(discord.Client):
+class OpenABDiscordBot(commands.Bot):
     def __init__(
         self,
         *,
@@ -60,13 +66,44 @@ class OpenABDiscordBot(discord.Client):
         timeout: int = 300,
         agent_config: Optional[dict[str, Any]] = None,
     ) -> None:
-        super().__init__(intents=intents)
+        super().__init__(command_prefix=commands.when_mentioned_or(PREFIX), intents=intents)
         self._openab_allowed = allowed_user_ids
         self._openab_allow_all = allow_all
         self._openab_config_path = Path(config_path).resolve() if config_path else None
         self._openab_workspace = workspace
         self._openab_timeout = timeout
         self._openab_agent_config = agent_config or {}
+
+    async def setup_hook(self) -> None:
+        """注册斜杠命令，使用户输入 / 时显示命令列表。"""
+        tree = self.tree
+
+        @tree.command(name="start", description="Welcome and auth status")
+        async def slash_start(interaction: discord.Interaction) -> None:
+            await self._slash_start(interaction)
+
+        @tree.command(name="whoami", description="Show your Discord user ID")
+        async def slash_whoami(interaction: discord.Interaction) -> None:
+            await self._slash_whoami(interaction)
+
+        @tree.command(name="new", description="Create new session (next message in new conversation)")
+        async def slash_new(interaction: discord.Interaction) -> None:
+            await self._slash_new(interaction)
+
+        @tree.command(name="resume", description="Resume previous session or switch to session by ID")
+        @discord.app_commands.describe(session_id="Optional session ID to switch to (omit to resume latest)")
+        async def slash_resume(interaction: discord.Interaction, session_id: Optional[str] = None) -> None:
+            await self._slash_resume(interaction, session_id)
+
+        @tree.command(name="sessions", description="How to view and switch sessions")
+        async def slash_sessions(interaction: discord.Interaction) -> None:
+            await self._slash_sessions(interaction)
+
+        try:
+            synced = await tree.sync()
+            logger.info("Discord slash commands synced: %s", len(synced))
+        except Exception as e:
+            logger.warning("Discord tree.sync failed: %s", e)
 
     def _refresh_allow_from_config(self) -> None:
         """从配置文件重新读取白名单与 allow_all，使 allowlist add 动态生效。"""
@@ -114,6 +151,95 @@ class OpenABDiscordBot(discord.Client):
         )
         await message.reply(msg)
 
+    async def handle_command_new(self, message: discord.Message) -> None:
+        """创建新会话（下一条消息在新会话中处理）。"""
+        if not self._is_user_allowed(message.author.id):
+            await message.reply(t(_user_lang(message), "unauthorized"))
+            return
+        set_new_session_next("dc", message.channel.id, message.author.id)
+        await message.reply(t(_user_lang(message), "session_new_created"))
+
+    async def handle_command_resume(self, message: discord.Message) -> None:
+        """!resume [会话ID]：不填则恢复延续上一会话；填则切换到该会话。"""
+        if not self._is_user_allowed(message.author.id):
+            await message.reply(t(_user_lang(message), "unauthorized"))
+            return
+        lang = _user_lang(message)
+        parts = (message.content or "").strip().split(maxsplit=1)
+        session_id = parts[1].strip() if len(parts) > 1 else None
+        if session_id:
+            set_resume_id("dc", message.channel.id, message.author.id, session_id)
+            await message.reply(t(lang, "session_resume_switched", id=session_id))
+        else:
+            set_resume_id("dc", message.channel.id, message.author.id, None)
+            await message.reply(t(lang, "session_resume_latest"))
+
+    async def handle_command_sessions(self, message: discord.Message) -> None:
+        """列出会话说明。"""
+        if not self._is_user_allowed(message.author.id):
+            await message.reply(t(_user_lang(message), "unauthorized"))
+            return
+        lang = _user_lang(message)
+        await message.reply(t(lang, "sessions_list_unavailable") + "\n\n" + t(lang, "session_resume_usage_discord"))
+
+    # ----- 斜杠命令实现（/ 命令列表用）-----
+    async def _slash_start(self, interaction: discord.Interaction) -> None:
+        lang = lang_from_env()
+        user_id = interaction.user.id if interaction.user else 0
+        if self._is_user_allowed(user_id):
+            msg = t(lang, "start_welcome")
+        else:
+            key = "auth_not_configured" if not self._is_auth_enabled() else "unauthorized"
+            msg = t(lang, key) + "\n\n" + t(lang, "your_user_id") + str(user_id)
+            msg += "\n\n" + t(lang, "unauthorized_cli_hint", cmd=f"openab allowlist add --discord {user_id}")
+            msg += "\n\n" + t(lang, "auth_allow_all_hint_discord")
+        await interaction.response.send_message(msg)
+
+    async def _slash_whoami(self, interaction: discord.Interaction) -> None:
+        lang = lang_from_env()
+        user = interaction.user
+        user_id = user.id if user else 0
+        name = user.display_name if user else ""
+        status = t(lang, "status_authorized") if self._is_user_allowed(user_id) else t(lang, "status_unauthorized")
+        msg = f"{t(lang, 'whoami_id')}{user_id}\n{t(lang, 'whoami_username')}{name}\n{t(lang, 'whoami_status')}{status}"
+        await interaction.response.send_message(msg)
+
+    async def _slash_new(self, interaction: discord.Interaction) -> None:
+        if not interaction.user:
+            return
+        if not self._is_user_allowed(interaction.user.id):
+            await interaction.response.send_message(t(lang_from_env(), "unauthorized"))
+            return
+        set_new_session_next("dc", interaction.channel_id or 0, interaction.user.id)
+        await interaction.response.send_message(t(lang_from_env(), "session_new_created"))
+
+    async def _slash_resume(self, interaction: discord.Interaction, session_id: Optional[str] = None) -> None:
+        if not interaction.user:
+            return
+        if not self._is_user_allowed(interaction.user.id):
+            await interaction.response.send_message(t(lang_from_env(), "unauthorized"))
+            return
+        lang = lang_from_env()
+        sid = (session_id or "").strip() or None
+        ch_id = interaction.channel_id or 0
+        if sid:
+            set_resume_id("dc", ch_id, interaction.user.id, sid)
+            await interaction.response.send_message(t(lang, "session_resume_switched", id=sid))
+        else:
+            set_resume_id("dc", ch_id, interaction.user.id, None)
+            await interaction.response.send_message(t(lang, "session_resume_latest"))
+
+    async def _slash_sessions(self, interaction: discord.Interaction) -> None:
+        if not interaction.user:
+            return
+        if not self._is_user_allowed(interaction.user.id):
+            await interaction.response.send_message(t(lang_from_env(), "unauthorized"))
+            return
+        lang = lang_from_env()
+        await interaction.response.send_message(
+            t(lang, "sessions_list_unavailable") + "\n\n" + t(lang, "session_resume_usage_discord")
+        )
+
     async def handle_agent_message(self, message: discord.Message) -> None:
         user_id = message.author.id
         lang = _user_lang(message)
@@ -137,13 +263,19 @@ class OpenABDiscordBot(discord.Client):
         done = asyncio.Event()
         typing_task = asyncio.create_task(_typing_until_done(message.channel, done))
 
+        agent_config = build_agent_config_with_session(
+            self._openab_agent_config,
+            "dc",
+            message.channel.id,
+            message.author.id,
+        )
         try:
             reply = await run_agent_async(
                 prompt,
                 workspace=self._openab_workspace,
                 timeout=self._openab_timeout,
                 lang=lang,
-                agent_config=self._openab_agent_config,
+                agent_config=agent_config,
             )
         except Exception as e:
             logger.exception("agent run error")
@@ -171,6 +303,15 @@ class OpenABDiscordBot(discord.Client):
             return
         if content == f"{PREFIX}whoami":
             await self.handle_command_whoami(message)
+            return
+        if content == f"{PREFIX}new":
+            await self.handle_command_new(message)
+            return
+        if content.startswith(f"{PREFIX}resume"):
+            await self.handle_command_resume(message)
+            return
+        if content == f"{PREFIX}sessions":
+            await self.handle_command_sessions(message)
             return
         await self.handle_agent_message(message)
 

@@ -32,6 +32,12 @@ MESSAGES = {
         ),
         "auth_allow_all_hint_discord": "管理员也可在配置中设置 discord.allow_all: true 开放给所有人使用。",
         "allowlist_added_by_token": "已加入白名单，之后可直接发消息使用。",
+        "session_new_created": "已创建新会话，下一条消息将在新会话中处理。",
+        "session_resume_switched": "已切换到会话 {id}。",
+        "session_resume_latest": "已恢复为延续上一会话。",
+        "session_resume_usage": "用法：/resume [会话ID]\n不填 ID 则恢复为延续上一会话；填 ID 则切换到该会话。",
+        "session_resume_usage_discord": "用法：!resume [会话ID]\n不填 ID 则恢复为延续上一会话；填 ID 则切换到该会话。",
+        "sessions_list_unavailable": "当前无法在机器人中列出会话列表。请在 Cursor 中查看会话 ID，使用 /resume <ID>（Discord：!resume <ID>）切换。",
     },
     "en": {
         "unauthorized": (
@@ -63,5 +69,11 @@ MESSAGES = {
         ),
         "auth_allow_all_hint_discord": "Admin can also set discord.allow_all: true in config to open to everyone.",
         "allowlist_added_by_token": "Added to allowlist. You can send messages now.",
+        "session_new_created": "New session created. Your next message will start a new conversation.",
+        "session_resume_switched": "Switched to session {id}.",
+        "session_resume_latest": "Resuming previous (latest) session.",
+        "session_resume_usage": "Usage: /resume [session ID]. Omit ID to resume latest; include ID to switch to that session.",
+        "session_resume_usage_discord": "Usage: !resume [session ID]. Omit ID to resume latest; include ID to switch to that session.",
+        "sessions_list_unavailable": "Session list is not available here. Get the session ID from Cursor, then use /resume <ID> (Discord: !resume <ID>) to switch.",
     },
 }

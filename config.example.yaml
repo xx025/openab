@@ -5,7 +5,7 @@
 
 agent:
   backend: cursor   # cursor | codex | gemini | claude | openclaw
-  # workspace: ~    # 不填或 ~ 表示家目录
+  # workspace: ~   # 不填或 ~ 表示家目录
   timeout: 300
 
 telegram:
@@ -25,6 +25,7 @@ discord:
 # 以下为各后端可选，多数情况可不写
 # cursor:
 #   cmd: agent
+#   continue_session: true   # 使用上一会话（agent --continue），默认 true
 # openclaw:   # 需先安装 npm i -g openclaw 并运行 openclaw gateway
 #   cmd: openclaw
 #   thinking: off   # off | minimal | low | medium | high | xhigh
