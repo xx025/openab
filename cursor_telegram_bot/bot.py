@@ -32,10 +32,10 @@ def _is_auth_enabled() -> bool:
 
 
 def _is_user_allowed(user_id: int) -> bool:
-    """当前用户是否在白名单内。未启用鉴权时视为允许所有人。"""
+    """当前用户是否在白名单内。未配置白名单时不允许任何人使用。"""
     allowed = _allowed_user_ids()
     if not allowed:
-        return True
+        return False
     return user_id in allowed
 
 
@@ -84,7 +84,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if _is_user_allowed(user_id):
         msg = t(lang, "start_welcome")
     else:
-        msg = t(lang, "unauthorized") + "\n\n" + t(lang, "your_user_id") + f"<code>{user_id}</code>"
+        key = "auth_not_configured" if not _is_auth_enabled() else "unauthorized"
+        msg = t(lang, key) + "\n\n" + t(lang, "your_user_id") + f"<code>{user_id}</code>"
     await update.message.reply_text(msg, parse_mode="HTML")
 
 
@@ -111,7 +112,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user_id = update.effective_user.id if update.effective_user else 0
     lang = _user_lang(update)
     if not _is_user_allowed(user_id):
-        msg = t(lang, "unauthorized") + "\n\n" + t(lang, "your_user_id") + f"<code>{user_id}</code>"
+        key = "auth_not_configured" if not _is_auth_enabled() else "unauthorized"
+        msg = t(lang, key) + "\n\n" + t(lang, "your_user_id") + f"<code>{user_id}</code>"
         await update.message.reply_text(msg, parse_mode="HTML")
         return
 

@@ -27,6 +27,10 @@ MESSAGES = {
         "agent_error": "执行出错：{error}",
         "agent_timeout": "⏱ 执行超时，请缩短问题或稍后重试。",
         "agent_no_output": "（无文本输出）",
+        "auth_not_configured": (
+            "管理员尚未配置鉴权白名单（ALLOWED_USER_IDS），机器人暂不可用。\n\n"
+            "发送 /whoami 可查看你的 User ID，提供给管理员配置后即可开放使用。"
+        ),
     },
     "en": {
         "unauthorized": (
@@ -50,6 +54,10 @@ MESSAGES = {
         "agent_error": "Error: {error}",
         "agent_timeout": "⏱ Request timed out. Try a shorter prompt or try again later.",
         "agent_no_output": "(no text output)",
+        "auth_not_configured": (
+            "Auth allowlist (ALLOWED_USER_IDS) is not configured yet. The bot is not available.\n\n"
+            "Send /whoami to see your User ID and ask the admin to configure it."
+        ),
     },
 }
 
