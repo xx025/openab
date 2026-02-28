@@ -4,7 +4,7 @@
 # 不设置 workspace 时默认使用用户家目录（~）。
 
 agent:
-  backend: cursor   # cursor | codex | gemini | claude | openclaw
+  backend: cursor   # cursor | codex（已实现）；gemini | claude | openclaw 尚未实现
   # workspace: ~   # 不填或 ~ 表示家目录
   timeout: 300
 

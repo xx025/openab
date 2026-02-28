@@ -4,7 +4,7 @@
 
 # OpenAB
 
-**Open Agent Bridge（开放智能体桥接）** — 将智能体（Cursor、Codex、Gemini、Claude、OpenClaw）与聊天平台连接。一份配置、一座桥。
+**Open Agent Bridge（开放智能体桥接）** — 将智能体与聊天平台连接。一份配置、一座桥。**当前已实现：** Cursor、Codex。_Gemini、Claude、OpenClaw 尚未实现。_
 
 [English](../../README.md) · [配置与使用说明](guide.md)
 
@@ -16,7 +16,7 @@ OpenAB 把**聊天平台**或 **HTTP API** 的请求转给你选的智能体后�
 
 | 智能体 | 聊天 / API |
 |--------|----------------|
-| Cursor、Codex、Gemini、Claude、OpenClaw | Telegram、Discord、**OpenAI 兼容 HTTP API**（`openab run serve`）、_更多计划中_ |
+| **Cursor**、**Codex**（已实现）<br>_Gemini、Claude、OpenClaw 尚未实现_ | Telegram、Discord、**OpenAI 兼容 HTTP API**（`openab run serve`）、_更多计划中_ |
 
 ---
 

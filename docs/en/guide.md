@@ -50,7 +50,7 @@ New keys are written to the existing config file (YAML or JSON by path); if no f
 | `telegram.allowed_user_ids` | For `run` | List of Telegram user IDs. Empty = nobody can use. Users get ID with `/whoami`. |
 | `discord.bot_token` | For `run discord` | Bot token from [Discord Developer Portal](https://discord.com/developers/applications); or pass with `openab run discord --token <token>`. |
 | `discord.allowed_user_ids` | For `run discord` | List of Discord user IDs. Empty = nobody. Users get ID with `!whoami` in DM. |
-| `agent.backend` | No | `cursor`, `codex`, `gemini`, `claude`, `openclaw` (default: `cursor`) |
+| `agent.backend` | No | `cursor`, `codex` (implemented); `gemini`, `claude`, `openclaw` _not yet implemented_ (default: `cursor`) |
 | `agent.workspace` | No | Agent working directory (default: **user home** `~`) |
 | `agent.timeout` | No | Timeout in seconds (default: 300) |
 | `cursor.cmd`, `codex.cmd`, `gemini.cmd`, `claude.cmd`, `openclaw.cmd` | No | CLI binary name for each backend |
@@ -74,11 +74,13 @@ Run `openab run serve` to expose an HTTP API compatible with OpenAI:
 
 ## Agent backends (prerequisites)
 
+**Currently implemented:** Cursor, Codex. **Not yet implemented:** Gemini, Claude, OpenClaw (config keys exist but may not work end-to-end).
+
 - **Cursor:** Cursor CLI — `agent status` / `agent login`. By default uses `--continue` to resume the previous session; set `cursor.continue_session: false` in config to start a new session each time.
-- **Codex:** `npm i -g @openai/codex` or `brew install --cask codex`; then `codex` or set API key.
-- **Gemini:** `npm i -g @google/gemini-cli` or `brew install gemini-cli`; then `gemini`.
-- **Claude:** CLI that supports `claude -p "prompt"`; set `agent.backend: claude` in config.
-- **OpenClaw:** `npm install -g openclaw`, then `openclaw onboard` and run the Gateway (`openclaw gateway` or daemon); set `agent.backend: openclaw`.
+- **Codex:** `npm i -g @openai/codex` or `brew install --cask codex`; then `codex` or set API key. Supports session resume and history list like Cursor.
+- **Gemini:** _Not yet implemented._ Intended: `npm i -g @google/gemini-cli` or `brew install gemini-cli`; then `gemini`.
+- **Claude:** _Not yet implemented._ Intended: CLI that supports `claude -p "prompt"`; set `agent.backend: claude` in config.
+- **OpenClaw:** _Not yet implemented._ Intended: `npm install -g openclaw`, then `openclaw onboard` and run the Gateway (`openclaw gateway` or daemon); set `agent.backend: openclaw`.
 
 ---
 

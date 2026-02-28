@@ -50,7 +50,7 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 | `telegram.allowed_user_ids` | 运行 `run` 时 | Telegram 用户 ID 列表。空则无人可用。用户可用 `/whoami` 查看自己的 ID。 |
 | `discord.bot_token` | 运行 `run discord` 时 | 来自 [Discord 开发者门户](https://discord.com/developers/applications) 的 Bot Token；也可用 `openab run discord --token <token>` 传入。 |
 | `discord.allowed_user_ids` | 运行 `run discord` 时 | Discord 用户 ID 列表。空则无人可用。用户可在私信中用 `!whoami` 查看 ID。 |
-| `agent.backend` | 否 | `cursor`、`codex`、`gemini`、`claude`、`openclaw`（默认：`cursor`） |
+| `agent.backend` | 否 | `cursor`、`codex`（已实现）；`gemini`、`claude`、`openclaw` _尚未实现_（默认：`cursor`） |
 | `agent.workspace` | 否 | 智能体工作目录（默认：**用户家目录** `~`） |
 | `agent.timeout` | 否 | 超时秒数（默认：300） |
 | `cursor.cmd`、`codex.cmd`、`gemini.cmd`、`claude.cmd`、`openclaw.cmd` | 否 | 各后端对应的 CLI 可执行文件名 |
@@ -74,11 +74,13 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 
 ## 智能体后端（前置要求）
 
+**当前已实现：** Cursor、Codex。**尚未实现：** Gemini、Claude、OpenClaw（配置项存在但端到端可能不可用）。
+
 - **Cursor：** Cursor CLI — `agent status` / `agent login`。默认带 `--continue` 延续上一会话；在配置中设置 `cursor.continue_session: false` 可改为每次新会话。
-- **Codex：** `npm i -g @openai/codex` 或 `brew install --cask codex`；然后使用 `codex` 或配置 API key。
-- **Gemini：** `npm i -g @google/gemini-cli` 或 `brew install gemini-cli`；然后使用 `gemini`。
-- **Claude：** 支持 `claude -p "prompt"` 的 CLI；在配置中设置 `agent.backend: claude`。
-- **OpenClaw：** `npm install -g openclaw`，然后执行 `openclaw onboard` 并运行 Gateway（`openclaw gateway` 或守护进程）；配置中设置 `agent.backend: openclaw`。
+- **Codex：** `npm i -g @openai/codex` 或 `brew install --cask codex`；然后使用 `codex` 或配置 API key。支持与 Cursor 类似的会话延续与历史列表。
+- **Gemini：** _尚未实现。_ 计划：`npm i -g @google/gemini-cli` 或 `brew install gemini-cli`；然后使用 `gemini`。
+- **Claude：** _尚未实现。_ 计划：支持 `claude -p "prompt"` 的 CLI；在配置中设置 `agent.backend: claude`。
+- **OpenClaw：** _尚未实现。_ 计划：`npm install -g openclaw`，然后执行 `openclaw onboard` 并运行 Gateway（`openclaw gateway` 或守护进程）；配置中设置 `agent.backend: openclaw`。
 
 ---
 

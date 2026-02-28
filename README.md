@@ -4,7 +4,7 @@
 
 # OpenAB
 
-**Open Agent Bridge** — Connect AI agents (Cursor, Codex, Gemini, Claude, OpenClaw) to chat platforms. One config, one bridge.
+**Open Agent Bridge** — Connect AI agents to chat platforms. One config, one bridge. **Currently implemented:** Cursor, Codex. _Gemini, Claude, OpenClaw not yet implemented._
 
 [中文](docs/zh-CN/README.md) · [Configuration & usage](docs/en/guide.md)
 
@@ -16,7 +16,7 @@ OpenAB forwards messages from **chat platforms** (or HTTP API) to an agent backe
 
 | Agents | Chats / API |
 |--------|----------------|
-| Cursor, Codex, Gemini, Claude, OpenClaw | Telegram, Discord, **OpenAI-compatible HTTP API** (`openab run serve`), _more planned_ |
+| **Cursor**, **Codex** (implemented)<br>_Gemini, Claude, OpenClaw not yet implemented_ | Telegram, Discord, **OpenAI-compatible HTTP API** (`openab run serve`), _more planned_ |
 
 ---
 
