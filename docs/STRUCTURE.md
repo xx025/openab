@@ -24,10 +24,6 @@ openab/                    # 主包
     ├── __init__.py
     └── main.py            # typer: openab run, (未来: config, agent, …)
 
-cursor_telegram_bot/       # 兼容层：python -m cursor_telegram_bot → openab
-├── __init__.py
-└── __main__.py
-
 docs/                      # 文档
 ├── README.md              # 文档索引
 ├── README.zh-CN.md        # 中文说明
