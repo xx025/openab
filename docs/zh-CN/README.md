@@ -12,11 +12,11 @@
 
 ## 做什么用
 
-OpenAB 把**聊天平台**的消息转给你选的智能体后端，并把回复发回。不用为每个智能体各起一个机器人 — 配置一次即可聊天。
+OpenAB 把**聊天平台**或 **HTTP API** 的请求转给你选的智能体后端，并把回复发回。一份配置、一座桥。
 
-| 智能体 | 聊天 |
-|--------|------|
-| Cursor、Codex、Gemini、Claude、OpenClaw | Telegram、Discord、_更多计划中_ |
+| 智能体 | 聊天 / API |
+|--------|----------------|
+| Cursor、Codex、Gemini、Claude、OpenClaw | Telegram、Discord、**OpenAI 兼容 HTTP API**（`openab run serve`）、_更多计划中_ |
 
 ---
 
@@ -26,25 +26,28 @@ OpenAB 把**聊天平台**的消息转给你选的智能体后端，并把回复
 
 ```bash
 pip install openab
+# 或从仓库：uv pip install -e .
 # 或：uv tool install openab
 ```
 
-**2. 配置** — 在 `~/.config/openab/` 下放一份 YAML/JSON 配置（参考 [config.example.yaml](../../config.example.yaml)）。至少需要机器人 token 和用户 ID 白名单。完整选项见 [配置与使用说明](guide.md)。
+**2. 配置** — 在 `~/.config/openab/` 下放一份 YAML/JSON 配置（参考 [config.example.yaml](../../config.example.yaml)）。至少需要机器人 token（Telegram/Discord）或仅用 API 可不配；白名单或 `api.key` 用于鉴权。完整选项见 [配置与使用说明](guide.md)。
 
 **3. 运行**
 
 ```bash
-openab              # 如 Telegram
-openab run-discord  # 如 Discord
+openab run serve     # OpenAI 兼容 API（POST /v1/chat/completions、GET /v1/models、POST /v1/responses）
+openab run telegram  # Telegram 机器人
+openab run discord   # Discord 机器人
 ```
 
-然后在对应聊天应用里打开机器人发消息即可。
+- 无配置时运行 `openab` 或 `openab run` 会提示并默认启动 API 服务。
+- 在聊天应用里打开机器人发消息，或将任意 OpenAI 兼容客户端指向 `http://127.0.0.1:8000/v1`，使用启动时打印的 API key。
 
 ---
 
 ## 文档
 
-- **[配置与使用说明](guide.md)** — 配置项、智能体前置、命令、安全、中英文。
+- **[配置与使用说明](guide.md)** — 配置项、智能体前置、命令、API 服务、安全、中英文。
 
 ---
 

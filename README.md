@@ -12,11 +12,11 @@
 
 ## What it does
 
-OpenAB forwards messages from **chat platforms** to an agent backend you choose and sends the reply back. No per-agent bots — configure once and chat.
+OpenAB forwards messages from **chat platforms** (or HTTP API) to an agent backend you choose and sends the reply back. One config, one bridge.
 
-| Agents | Chats |
-|--------|-------|
-| Cursor, Codex, Gemini, Claude, OpenClaw | Telegram, Discord, _more planned_ |
+| Agents | Chats / API |
+|--------|----------------|
+| Cursor, Codex, Gemini, Claude, OpenClaw | Telegram, Discord, **OpenAI-compatible HTTP API** (`openab run serve`), _more planned_ |
 
 ---
 
@@ -26,25 +26,29 @@ OpenAB forwards messages from **chat platforms** to an agent backend you choose 
 
 ```bash
 pip install openab
+# or: uv pip install -e .   (from repo)
 # or: uv tool install openab
 ```
 
-**2. Config** — Put a YAML/JSON config in `~/.config/openab/` (see [config.example.yaml](config.example.yaml)). You need at least a bot token and an allowlist of user IDs. Full options: [docs/en/guide.md](docs/en/guide.md).
+**2. Config** — Put a YAML/JSON config in `~/.config/openab/` (see [config.example.yaml](config.example.yaml)). You need at least a bot token (Telegram/Discord) or nothing for API-only; allowlist or `api.key` for auth. Full options: [docs/en/guide.md](docs/en/guide.md).
 
 **3. Run**
 
 ```bash
-openab              # e.g. Telegram
-openab run-discord  # e.g. Discord
+openab run serve     # OpenAI-compatible API (POST /v1/chat/completions, GET /v1/models, POST /v1/responses)
+openab run telegram  # Telegram bot
+openab run discord   # Discord bot
 ```
 
-Then open the bot in your chat app and send a message.
+- No config? Run `openab` or `openab run` — you get a hint and the API server starts by default.
+- Then open the bot in your chat app, or point any OpenAI-compatible client at `http://127.0.0.1:8000/v1` with the API key printed at startup.
 
 ---
 
 ## Docs
 
-- **[Configuration & usage](docs/en/guide.md)** — Config keys, agent setup, commands, security, i18n.
+- **[Configuration & usage](docs/en/guide.md)** — Config keys, agent setup, commands, API server, security, i18n.
+- **[中文说明](docs/zh-CN/guide.md)** — 配置与使用（中文）
 
 ---
 

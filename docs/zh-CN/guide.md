@@ -6,7 +6,7 @@
 
 ---
 
-**运行环境：** OpenAB 支持 **Linux** 与 **macOS**。所有 CLI 命令（`openab run`、`openab run-discord`、`openab config`、各智能体后端）在两者上均可使用。**install-service**（systemd 用户服务）**仅支持 Linux**；在 macOS 上请直接运行 `openab run` 或 `openab run-discord`。
+**运行环境：** OpenAB 支持 **Linux** 与 **macOS**。所有 CLI 命令（`openab run serve`、`openab run telegram`、`openab run discord`、`openab config`、各智能体后端）在两者上均可使用。**install-service**（systemd 用户服务）**仅支持 Linux**；在 macOS 上请直接运行 `openab run telegram` 或 `openab run discord`。
 
 ---
 
@@ -30,8 +30,8 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 |----|----------|------|
 | `telegram.bot_token` | 运行 `run` 时 | 来自 [@BotFather](https://t.me/BotFather) 的 Bot Token |
 | `telegram.allowed_user_ids` | 运行 `run` 时 | Telegram 用户 ID 列表。空则无人可用。用户可用 `/whoami` 查看自己的 ID。 |
-| `discord.bot_token` | 运行 `run-discord` 时 | 来自 [Discord 开发者门户](https://discord.com/developers/applications) 的 Bot Token |
-| `discord.allowed_user_ids` | 运行 `run-discord` 时 | Discord 用户 ID 列表。空则无人可用。用户可在私信中用 `!whoami` 查看 ID。 |
+| `discord.bot_token` | 运行 `run discord` 时 | 来自 [Discord 开发者门户](https://discord.com/developers/applications) 的 Bot Token |
+| `discord.allowed_user_ids` | 运行 `run discord` 时 | Discord 用户 ID 列表。空则无人可用。用户可在私信中用 `!whoami` 查看 ID。 |
 | `agent.backend` | 否 | `cursor`、`codex`、`gemini`、`claude`、`openclaw`（默认：`cursor`） |
 | `agent.workspace` | 否 | 智能体工作目录（默认：**用户家目录** `~`） |
 | `agent.timeout` | 否 | 超时秒数（默认：300） |
@@ -45,7 +45,12 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 
 ## OpenAI API 兼容服务
 
-运行 `openab run serve` 可启动与 OpenAI Chat Completions 格式兼容的 HTTP 接口。兼容客户端（Open WebUI、LiteLLM、OpenAI SDK 等）可将 `base_url=http://127.0.0.1:8000/v1`，若在配置中设置了 `api.key` 则需填写对应 API Key。请求中最后一条用户消息会发给当前配置的智能体（Cursor、OpenClaw 等），回复以 `choices[0].message.content` 返回。当前不支持流式输出。
+运行 `openab run serve` 可启动与 OpenAI 兼容的 HTTP 接口：
+
+- **端点：** `POST /v1/chat/completions`、`GET /v1/models`、`POST /v1/responses`
+- **鉴权：** 若在配置中设置了 `api.key`，请求需携带 `Authorization: Bearer <api.key>`。若未设置 `api.key`，首次启动时会自动生成并写入配置并打印（每次启动也会打印当前 key）。
+- **客户端：** 使用 `base_url=http://127.0.0.1:8000/v1` 与打印的 API key。最后一条用户消息会发给当前配置的智能体，回复以 `choices[0].message.content`（chat）或 `output_text` / `output[].content`（responses）返回。**流式：** chat completions 支持 `stream: true`（单块 SSE）。
+- **自助加白名单：** 在 Telegram 或 Discord 中，任何人发送与 `api.key` 完全一致的一条消息即可被加入该平台白名单并写回配置，无需重启。
 
 ---
 
@@ -99,7 +104,8 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 
 ## 鉴权与安全
 
-- 仅列入 `telegram.allowed_user_ids` 或 `discord.allowed_user_ids` 的用户可发送提示；其他用户会收到「未授权」提示。
+- 仅列入 `telegram.allowed_user_ids` 或 `discord.allowed_user_ids` 的用户可发送提示；其他用户会收到「未授权」提示。也可设置 `telegram.allow_all` 或 `discord.allow_all` 为 `true`（请谨慎使用）。
+- **用 token 加白名单：** 在 Telegram 或 Discord 中，发送内容与配置里 `api.key` 完全一致的一条消息，即可将发送者加入该平台白名单并写回配置（无需重启）。
 - 请勿将含 token 的配置文件提交到仓库。保持 `~/.config/openab/config.yaml`（或你设置的 `OPENAB_CONFIG` 路径）私密。
 
 ---

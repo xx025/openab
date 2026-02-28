@@ -6,7 +6,7 @@ Technical reference for configuration, agent backends, commands, and security. C
 
 ---
 
-**Platforms:** OpenAB runs on **Linux** and **macOS**. All CLI commands (`openab run`, `openab run-discord`, `openab config`, agent backends) work on both. The **install-service** command (systemd user unit) is **Linux-only**; on macOS run the bot directly with `openab run` or `openab run-discord`.
+**Platforms:** OpenAB runs on **Linux** and **macOS**. All CLI commands (`openab run serve`, `openab run telegram`, `openab run discord`, `openab config`, agent backends) work on both. The **install-service** command (systemd user unit) is **Linux-only**; on macOS run the bot directly with `openab run telegram` or `openab run discord`.
 
 ---
 
@@ -30,8 +30,8 @@ New keys are written to the existing config file (YAML or JSON by path); if no f
 |-----|----------|-------------|
 | `telegram.bot_token` | For `run` | Bot token from [@BotFather](https://t.me/BotFather) |
 | `telegram.allowed_user_ids` | For `run` | List of Telegram user IDs. Empty = nobody can use. Users get ID with `/whoami`. |
-| `discord.bot_token` | For `run-discord` | Bot token from [Discord Developer Portal](https://discord.com/developers/applications) |
-| `discord.allowed_user_ids` | For `run-discord` | List of Discord user IDs. Empty = nobody. Users get ID with `!whoami` in DM. |
+| `discord.bot_token` | For `run discord` | Bot token from [Discord Developer Portal](https://discord.com/developers/applications) |
+| `discord.allowed_user_ids` | For `run discord` | List of Discord user IDs. Empty = nobody. Users get ID with `!whoami` in DM. |
 | `agent.backend` | No | `cursor`, `codex`, `gemini`, `claude`, `openclaw` (default: `cursor`) |
 | `agent.workspace` | No | Agent working directory (default: **user home** `~`) |
 | `agent.timeout` | No | Timeout in seconds (default: 300) |
@@ -45,7 +45,12 @@ New keys are written to the existing config file (YAML or JSON by path); if no f
 
 ## OpenAI API compatible server
 
-Run `openab run serve` to expose an HTTP API that matches the OpenAI Chat Completions format. Compatible clients (Open WebUI, LiteLLM, OpenAI SDK, etc.) can use `base_url=http://127.0.0.1:8000/v1` and any non-empty `api_key` if you set `api.key` in config. The last user message in the request is sent to your configured agent (Cursor, OpenClaw, etc.); the reply is returned as `choices[0].message.content`. Streaming is not supported yet.
+Run `openab run serve` to expose an HTTP API compatible with OpenAI:
+
+- **Endpoints:** `POST /v1/chat/completions`, `GET /v1/models`, `POST /v1/responses`
+- **Auth:** If `api.key` is set in config, requests must send `Authorization: Bearer <api.key>`. If `api.key` is missing, the server generates one at first start, writes it to config, and prints it (and prints it again on every start).
+- **Clients:** Use `base_url=http://127.0.0.1:8000/v1` and the API key. The last user message is sent to your configured agent; the reply is returned as `choices[0].message.content` (chat) or `output_text` / `output[].content` (responses). **Streaming:** `stream: true` is supported for chat completions (single-chunk SSE).
+- **Self-add allowlist:** In Telegram or Discord, any user can send the exact `api.key` (as a message) to be added to that platform’s allowlist automatically; the config is updated and no restart is needed.
 
 ---
 
@@ -99,7 +104,8 @@ Any other message is sent to the agent (DM or channel where the bot can read).
 
 ## Auth & security
 
-- Only users listed in `telegram.allowed_user_ids` or `discord.allowed_user_ids` can send prompts; others get an "unauthorized" message.
+- Only users listed in `telegram.allowed_user_ids` or `discord.allowed_user_ids` can send prompts; others get an "unauthorized" message. Alternatively, set `telegram.allow_all` or `discord.allow_all` to `true` (use with caution).
+- **Token = allowlist:** In Telegram or Discord, sending a message whose content is exactly the configured `api.key` adds that user to the allowlist and saves the config (no restart needed).
 - Do not commit config files that contain tokens. Keep `~/.config/openab/config.yaml` (or your `OPENAB_CONFIG` path) private.
 
 ---
