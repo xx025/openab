@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openab"
-version = "0.3.0"
+version = "0.3.1"
 description = "Open Agent Bridge — connect agent backends (CLIs, APIs) to chat platforms (Telegram, …)."
 readme = "README.md"
 license = "MIT"
