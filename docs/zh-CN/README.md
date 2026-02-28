@@ -26,22 +26,39 @@ OpenAB 把**聊天平台**或 **HTTP API** 的请求转给你选的智能体后�
 
 ```bash
 pip install openab
-# 或从仓库：uv pip install -e .
 # 或：uv tool install openab
+# 或从仓库：uv pip install -e .
 ```
 
-**2. 配置** — 在 `~/.config/openab/` 下放一份 YAML/JSON 配置（参考 [config.example.yaml](../../config.example.yaml)）。至少需要机器人 token（Telegram/Discord）或仅用 API 可不配；白名单或 `api.key` 用于鉴权。Bot token 也可通过 `--token` 传入（如 `openab run telegram --token <token>`）；API 服务可用 `openab run serve --token <key>` 指定本次 API key。完整选项见 [配置与使用说明](guide.md)。
-
-**3. 运行**
+**2. 创建配置**
 
 ```bash
-openab run serve     # OpenAI 兼容 API（POST /v1/chat/completions、GET /v1/models、POST /v1/responses）
-openab run telegram  # Telegram 机器人（可选 --token、--workspace、--verbose）
-openab run discord   # Discord 机器人（可选 --token、--workspace、--verbose）
+mkdir -p ~/.config/openab
+cp config.example.yaml ~/.config/openab/config.yaml
+# 编辑 config.yaml：填写 telegram.bot_token 和/或 discord.bot_token
 ```
 
-- 无配置时运行 `openab` 或 `openab run` 会提示并默认启动 API 服务。
-- 在聊天应用里打开机器人发消息，或将任意 OpenAI 兼容客户端指向 `http://127.0.0.1:8000/v1`，使用启动时打印的 API key。
+**3. 获取机器人 Token**
+
+- **Telegram：** 打开 [@BotFather](https://t.me/BotFather) → 发送 `/newbot` → 按提示操作 → 把得到的 token 填进配置的 `telegram.bot_token`（或用 `openab run telegram --token <token>` 传入）。
+- **Discord：** 打开 [Discord 开发者门户](https://discord.com/developers/applications) → 新建应用 → Bot → 重置 Token → 复制到配置的 `discord.bot_token`（或运行时加 `--token`）。
+
+**4. 把自己加入白名单** — 启动机器人后，在聊天里发送 `/whoami`（Telegram）或 `!whoami`（Discord）得到你的用户 ID。然后任选其一：
+
+- 写入配置：`openab config set telegram.allowed_user_ids "你的ID"`（或 `discord.allowed_user_ids`），**或**
+- 把 API key（先运行一次 `openab run serve` 会打印）作为一条消息发给机器人，会自动把你加入白名单。
+
+**5. 运行并开始聊天**
+
+```bash
+openab run telegram   # 或：openab run discord
+# 在 Telegram/Discord 里打开你的机器人，发任意消息即可。输入 /resume 可看到会话按钮（延续上一会话、创建新会话、或选择历史会话）。
+```
+
+- **仅用 API：** 运行 `openab run serve`，无需机器人 token。将客户端指向 `http://127.0.0.1:8000/v1`，鉴权用启动时打印的 API key。
+- 没有配置时，直接运行 `openab` 或 `openab run` 会默认启动 API 服务并给出提示。
+
+完整选项见 [配置与使用说明](guide.md)。
 
 ---
 

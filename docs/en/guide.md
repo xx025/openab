@@ -6,6 +6,24 @@ Technical reference for configuration, agent backends, commands, and security. C
 
 ---
 
+## Quick start (first-time)
+
+Follow these steps to get the bot or API running in a few minutes:
+
+1. **Install** — `pip install openab` (Python 3.10+).
+2. **Choose platform** — Use **Telegram** or **Discord** for chat, or **HTTP API** only (`openab run serve`, no bot token needed).
+3. **Get token**  
+   - Telegram: [@BotFather](https://t.me/BotFather) → `/newbot` → copy the Bot Token.  
+   - Discord: [Developer Portal](https://discord.com/developers/applications) → New Application → Bot → Reset Token.
+4. **Create config** — `mkdir -p ~/.config/openab`, copy the repo’s [config.example.yaml](../../config.example.yaml) as `config.yaml`, and set `telegram.bot_token` or `discord.bot_token` (or pass with `openab run telegram --token <token>` and skip writing to file).
+5. **Allow yourself** — After starting the bot, send `/whoami` (Telegram) or `!whoami` (Discord) to get your user ID, then run `openab config set telegram.allowed_user_ids "YOUR_ID"` (or `discord.allowed_user_ids`); **or** run `openab run serve` once, copy the printed API key, and send that exact string as a message to the bot — it will add you to the allowlist and save the config.
+6. **Run** — `openab run telegram` or `openab run discord`. Open your bot in the app and send any message to talk to the agent.
+7. **Session switching** — Send `/resume` (Telegram) or `!resume` (Discord) to get buttons: **Resume latest**, **New session**, or pick a **history session** from your local Cursor chats (click to switch).
+
+If you see “unauthorized”, ensure your user ID is in the platform’s `allowed_user_ids` or you’ve self-added via the API key. See [Auth & security](#auth--security) below.
+
+---
+
 **Platforms:** OpenAB runs on **Linux** and **macOS**. All CLI commands (`openab run serve`, `openab run telegram`, `openab run discord`, `openab config`, agent backends) work on both. The **install-service** command (systemd user unit) is **Linux-only**; on macOS run the bot directly with `openab run telegram` or `openab run discord`.
 
 ---
@@ -88,9 +106,10 @@ Run `openab run serve` to expose an HTTP API compatible with OpenAI:
 |---------|-------------|
 | `/start` | Welcome and auth status |
 | `/whoami` | Show your Telegram user ID (for allowlist) |
-| `/new` | Create a new session (next message starts a new conversation; Cursor backend only) |
-| `/resume [session ID]` | Omit ID to resume previous session; include ID to switch to that session |
-| `/sessions` | How to view and switch sessions (list sessions in Cursor) |
+| `/new` | Create a new session (next message in new conversation; Cursor backend only) |
+| `/resume` | **Recommended:** With no argument, shows buttons to **Resume latest**, **New session**, or pick a **history session** from your local Cursor chats (click to switch) |
+| `/resume [session ID]` | Switch directly to the given session (IDs come from `~/.cursor/chats`) |
+| `/sessions` | How to view and switch sessions |
 
 Any other message is sent to the agent.
 
@@ -101,7 +120,8 @@ Any other message is sent to the agent.
 | `!start` | Welcome and auth status |
 | `!whoami` | Show your Discord user ID (for allowlist) |
 | `!new` | Create a new session (next message in new conversation; Cursor backend only) |
-| `!resume [session ID]` | Omit ID to resume previous session; include ID to switch to that session |
+| `!resume` | **Recommended:** With no argument, shows buttons to **Resume latest**, **New session**, or pick a **history session** (click to switch) |
+| `!resume [session ID]` | Switch directly to the given session |
 | `!sessions` | How to view and switch sessions |
 
 Any other message is sent to the agent (DM or channel where the bot can read).
@@ -120,3 +140,15 @@ Any other message is sent to the agent (DM or channel where the bot can read).
 
 - **Bot:** Language follows the chat app (e.g. Telegram `language_code`). `zh*` → 中文; otherwise English.
 - **CLI:** Follows `LANG` (e.g. `LANG=zh_CN.UTF-8` for 中文).
+
+---
+
+## FAQ
+
+| Issue | What to do |
+|-------|------------|
+| "Unauthorized" when sending messages | Send `/whoami` or `!whoami` in chat to get your ID, then `openab config set telegram.allowed_user_ids "ID"` (or `discord.allowed_user_ids`); or send the exact `api.key` (or the key printed when running `openab run serve`) as a message to the bot to self-add. |
+| Cursor says not logged in or unavailable | Run `agent status` or `agent login` in a terminal; ensure Cursor CLI is logged in and on PATH. |
+| No history session buttons on `/resume` | History comes from `~/.cursor/chats` on the machine running OpenAB. If you’ve never chatted in Cursor or the dir is empty, only "Resume latest" and "New session" are shown. |
+| Want a new session every time | Set `cursor.continue_session: false` in config. |
+| Need to restart after config change? | Allowlist and API key (when set via self-add or `config set`) are written to config and don’t require restart; changing `agent.backend`, `workspace`, or token does require restarting the `openab run` process. |

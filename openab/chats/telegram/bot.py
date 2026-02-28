@@ -11,8 +11,9 @@ from telegram import Update, BotCommand, InlineKeyboardButton, InlineKeyboardMar
 from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from telegram.error import Conflict
 
-from openab.agents import run_agent_async
+from openab.agents import get_backend, run_agent_async
 from openab.core.config import load_config, parse_allowed_user_ids, try_add_allowlist_by_api_token
+from openab.core.codex_sessions import list_codex_sessions
 from openab.core.cursor_chats import list_cursor_sessions
 from openab.core.cursor_session_state import (
     set_new_session_next,
@@ -127,7 +128,7 @@ async def cmd_whoami(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def cmd_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """创建新会话：下一条消息将在新会话中处理（仅 Cursor 后端生效）。"""
+    """创建新会话：下一条消息将在新会话中处理（Cursor/Codex 后端生效）。"""
     if not update.message or not update.effective_user or not update.effective_chat:
         return
     user_id = update.effective_user.id
@@ -162,7 +163,9 @@ async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 InlineKeyboardButton(t(lang, "btn_new_session"), callback_data="new_session"),
             ],
         ]
-        for session_id, display_name in list_cursor_sessions(max_sessions=12):
+        backend = get_backend(context.bot_data.get("openab_agent_config"))
+        sessions = list_codex_sessions(max_sessions=12) if backend == "codex" else list_cursor_sessions(max_sessions=12)
+        for session_id, display_name in sessions:
             keyboard.append([InlineKeyboardButton(display_name, callback_data=f"resume:{session_id}")])
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(t(lang, "session_resume_choose"), reply_markup=reply_markup)

@@ -31,7 +31,8 @@ discord:
 #   thinking: off   # off | minimal | low | medium | high | xhigh
 # codex:
 #   cmd: codex
-#   skip_git_check: false
+#   skip_git_check: true    # 默认 true，允许非 Git 目录执行
+#   continue_session: true # 默认延续上一会话（exec resume --last）
 # gemini:
 #   cmd: gemini
 # claude:

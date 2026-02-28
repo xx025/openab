@@ -725,7 +725,7 @@ wheels = [
 
 [[package]]
 name = "openab"
-version = "0.3.1"
+version = "0.1.5"
 source = { editable = "." }
 dependencies = [
     { name = "discord-py" },

@@ -56,13 +56,16 @@ def build_agent_config_with_session(
     user_id: int,
 ) -> dict:
     """
-    根据当前用户会话状态，在 base 配置上叠加单次 _cursor_session_new / _cursor_resume_id，
+    根据当前用户会话状态，在 base 配置上叠加会话覆盖（新会话 / 指定 resume id）。
+    同时写入通用 _session_new / _resume_id（供 Codex 等）与 _cursor_*（兼容 Cursor）。
     并清除“新会话”一次性标记。返回新 dict，不修改 base。
     """
     use_new, resume_id = get_session_override(platform, chat_or_channel_id, user_id)
     out = dict(base_agent_config) if base_agent_config else {}
     if use_new:
+        out["_session_new"] = True
         out["_cursor_session_new"] = True
     if resume_id:
+        out["_resume_id"] = resume_id
         out["_cursor_resume_id"] = resume_id
     return out

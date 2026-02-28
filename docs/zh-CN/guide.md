@@ -6,6 +6,24 @@
 
 ---
 
+## 新手上路（第一次使用）
+
+按下面步骤即可在几分钟内用上机器人或 API：
+
+1. **安装** — `pip install openab`（需 Python 3.10+）。
+2. **选平台** — 用 **Telegram** 或 **Discord** 聊天，或只用 **HTTP API**（`openab run serve`，无需机器人）。
+3. **拿 Token**  
+   - Telegram： [@BotFather](https://t.me/BotFather) → `/newbot` → 复制 Bot Token。  
+   - Discord： [开发者门户](https://discord.com/developers/applications) → 新建应用 → Bot → 重置 Token。
+4. **写配置** — `mkdir -p ~/.config/openab`，把仓库里的 [config.example.yaml](../../config.example.yaml) 复制为 `config.yaml`，填上 `telegram.bot_token` 或 `discord.bot_token`（也可用 `openab run telegram --token <token>` 传入，不写进文件）。
+5. **加白名单** — 启动机器人后，在聊天里发 `/whoami`（Telegram）或 `!whoami`（Discord）得到你的 ID，然后执行 `openab config set telegram.allowed_user_ids "你的ID"`（或 `discord.allowed_user_ids`）；**或者** 先运行一次 `openab run serve` 记下打印的 API key，再在聊天里把这条 key 原样发给机器人，会自动加白并写回配置。
+6. **运行** — `openab run telegram` 或 `openab run discord`。在应用里打开你的机器人，发任意消息即可与智能体对话。
+7. **会话切换** — 输入 `/resume`（Telegram）或 `!resume`（Discord）会弹出按钮：**延续上一会话**、**创建新会话**、以及从本机 Cursor 会话列表里选一个历史会话（点击即可切换）。
+
+遇到「未授权」：确认你的用户 ID 已在对应平台的 `allowed_user_ids` 中，或已通过发送 API key 自助加白。更多见下方 [鉴权与安全](#鉴权与安全)。
+
+---
+
 **运行环境：** OpenAB 支持 **Linux** 与 **macOS**。所有 CLI 命令（`openab run serve`、`openab run telegram`、`openab run discord`、`openab config`、各智能体后端）在两者上均可使用。**install-service**（systemd 用户服务）**仅支持 Linux**；在 macOS 上请直接运行 `openab run telegram` 或 `openab run discord`。
 
 ---
@@ -87,10 +105,11 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 | 命令 | 说明 |
 |------|------|
 | `/start` | 欢迎语与鉴权状态 |
-| `/whoami` | 显示你的 Telegram 用户 ID（用于白名单） |
-| `/new` | 创建新会话（下一条消息将在新会话中处理，仅 Cursor 后端） |
-| `/resume [会话ID]` | 不填 ID 则恢复为延续上一会话；填 ID 则切换到该会话 |
-| `/sessions` | 说明如何查看与切换会话（会话列表需在 Cursor 中查看） |
+| `/whoami` | 显示你的 Telegram 用户 ID（用于加入白名单） |
+| `/new` | 创建新会话（下一条消息在新会话中处理；仅 Cursor 后端） |
+| `/resume` | **推荐**：不填参数时弹出按钮，可点击「延续上一会话」「创建新会话」或从本机 Cursor 历史会话列表中选择一个切换 |
+| `/resume [会话ID]` | 直接切换到指定会话（会话 ID 来自本机 `~/.cursor/chats` 下的会话列表） |
+| `/sessions` | 说明如何查看与切换会话 |
 
 其他消息会转发给智能体。
 
@@ -99,9 +118,10 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 | 命令 | 说明 |
 |------|------|
 | `!start` | 欢迎语与鉴权状态 |
-| `!whoami` | 显示你的 Discord 用户 ID（用于白名单） |
-| `!new` | 创建新会话（下一条消息在新会话中处理，仅 Cursor 后端） |
-| `!resume [会话ID]` | 不填 ID 则恢复延续上一会话；填 ID 则切换到该会话 |
+| `!whoami` | 显示你的 Discord 用户 ID（用于加入白名单） |
+| `!new` | 创建新会话（下一条消息在新会话中处理；仅 Cursor 后端） |
+| `!resume` | **推荐**：不填参数时出现按钮，可点击「延续上一会话」「创建新会话」或从本机 Cursor 历史会话中选择一个切换 |
+| `!resume [会话ID]` | 直接切换到指定会话 |
 | `!sessions` | 说明如何查看与切换会话 |
 
 其他消息会转发给智能体（私信或机器人可读的频道）。
@@ -120,3 +140,15 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 
 - **机器人：** 语言随聊天应用（如 Telegram 的 `language_code`）。`zh*` → 中文；其余为英文。
 - **CLI：** 随环境变量 `LANG`（如 `LANG=zh_CN.UTF-8` 为中文）。
+
+---
+
+## 常见问题
+
+| 问题 | 处理 |
+|------|------|
+| 发消息提示「未授权」 | 在聊天里发 `/whoami` 或 `!whoami` 得到你的 ID，用 `openab config set telegram.allowed_user_ids "ID"`（或 `discord.allowed_user_ids`）加入白名单；或把配置里的 `api.key`（或启动 serve 时打印的 key）原样发给机器人自助加白。 |
+| Cursor 报未登录或不可用 | 在终端执行 `agent status` 或 `agent login`，确保 Cursor CLI 已登录且可用。 |
+| `/resume` 没有历史会话按钮 | 历史会话来自本机 `~/.cursor/chats`。若从未在 Cursor 里聊过，或目录为空，则只显示「延续上一会话」和「创建新会话」。 |
+| 想每次都是新会话 | 在配置中设置 `cursor.continue_session: false`。 |
+| 修改配置后要重启吗？ | 白名单、API key 等通过「发 API key 加白」或 `config set` 写回配置后无需重启；修改 `agent.backend`、`workspace`、token 等需重启当前运行的 `openab run` 进程。 |

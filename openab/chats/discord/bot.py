@@ -10,8 +10,9 @@ import discord
 from discord import Intents
 from discord.ext import commands
 
-from openab.agents import run_agent_async
+from openab.agents import get_backend, run_agent_async
 from openab.core.config import load_config, parse_allowed_user_ids, try_add_allowlist_by_api_token
+from openab.core.codex_sessions import list_codex_sessions
 from openab.core.cursor_chats import list_cursor_sessions
 from openab.core.cursor_session_state import (
     set_new_session_next,
@@ -233,7 +234,8 @@ class OpenABDiscordBot(commands.Bot):
             set_resume_id("dc", message.channel.id, message.author.id, session_id)
             await message.reply(t(lang, "session_resume_switched", id=session_id))
         else:
-            sessions = list_cursor_sessions(max_sessions=12)
+            backend = get_backend(self._openab_agent_config)
+            sessions = list_codex_sessions(max_sessions=12) if backend == "codex" else list_cursor_sessions(max_sessions=12)
             view = _ResumeChoiceView(self, lang, sessions=sessions)
             await message.reply(t(lang, "session_resume_choose"), view=view)
 
@@ -289,7 +291,8 @@ class OpenABDiscordBot(commands.Bot):
             set_resume_id("dc", ch_id, interaction.user.id, sid)
             await interaction.response.send_message(t(lang, "session_resume_switched", id=sid))
         else:
-            sessions = list_cursor_sessions(max_sessions=12)
+            backend = get_backend(self._openab_agent_config)
+            sessions = list_codex_sessions(max_sessions=12) if backend == "codex" else list_cursor_sessions(max_sessions=12)
             view = _ResumeChoiceView(self, lang, sessions=sessions)
             await interaction.response.send_message(t(lang, "session_resume_choose"), view=view)
 

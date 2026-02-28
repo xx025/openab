@@ -42,15 +42,14 @@ def _cursor_session_override(agent_config: dict[str, Any] | None) -> tuple[bool,
     """
     单次调用的会话覆盖（由 Telegram/Discord 传入）。
     返回 (use_new_session, resume_chat_id)。
-    use_new_session=True 表示本次不传 --continue 且不传 --resume（新会话）。
-    resume_chat_id 非空表示本次传 --resume <id>。
+    优先读通用 _session_new / _resume_id，兼容 _cursor_session_new / _cursor_resume_id。
     """
     if not agent_config:
         return (False, None)
-    new = agent_config.get("_cursor_session_new")
+    new = agent_config.get("_session_new") or agent_config.get("_cursor_session_new")
     if new is True:
         return (True, None)
-    rid = agent_config.get("_cursor_resume_id")
+    rid = agent_config.get("_resume_id") or agent_config.get("_cursor_resume_id")
     if rid is not None and str(rid).strip():
         return (False, str(rid).strip())
     return (False, None)
