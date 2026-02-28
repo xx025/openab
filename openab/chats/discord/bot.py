@@ -64,8 +64,6 @@ class OpenABDiscordBot(discord.Client):
         self._openab_agent_config = agent_config or {}
 
     def _is_user_allowed(self, user_id: int) -> bool:
-        if len(self._openab_allowed) == 0:
-            return True  # 未设置白名单时允许所有人（启动时已警告）
         return user_id in self._openab_allowed
 
     def _is_auth_enabled(self) -> bool:
@@ -77,7 +75,8 @@ class OpenABDiscordBot(discord.Client):
         if self._is_user_allowed(user_id):
             msg = t(lang, "start_welcome")
         else:
-            msg = t(lang, "unauthorized") + "\n\n" + t(lang, "your_user_id") + str(user_id)
+            key = "auth_not_configured" if not self._is_auth_enabled() else "unauthorized"
+            msg = t(lang, key) + "\n\n" + t(lang, "your_user_id") + str(user_id)
             msg += "\n\n" + t(lang, "unauthorized_cli_hint", cmd=f"openab allowlist add --discord {user_id}")
         await message.reply(msg)
 
@@ -97,7 +96,8 @@ class OpenABDiscordBot(discord.Client):
         user_id = message.author.id
         lang = _user_lang(message)
         if not self._is_user_allowed(user_id):
-            msg = t(lang, "unauthorized") + "\n\n" + t(lang, "your_user_id") + str(user_id)
+            key = "auth_not_configured" if not self._is_auth_enabled() else "unauthorized"
+            msg = t(lang, key) + "\n\n" + t(lang, "your_user_id") + str(user_id)
             msg += "\n\n" + t(lang, "unauthorized_cli_hint", cmd=f"openab allowlist add --discord {user_id}")
             await message.reply(msg)
             return
