@@ -1,0 +1,34 @@
+# OpenAB 配置文件示例（YAML）
+# 复制到默认路径：~/.config/openab/config.yaml（或 config.yml / config.json）
+# 或设置环境变量 OPENAB_CONFIG 指向本文件。
+# 不设置 workspace 时默认使用用户家目录（~）。
+
+agent:
+  backend: cursor   # cursor | codex | gemini | claude | openclaw
+  # workspace: ~    # 不填或 ~ 表示家目录
+  timeout: 300
+
+telegram:
+  bot_token: ""     # 从 @BotFather 获取
+  allowed_user_ids: []  # 用户发送 /whoami 可查看 ID
+
+discord:
+  bot_token: ""     # 从 Discord 开发者门户获取
+  allowed_user_ids: []
+
+# 以下为各后端可选，多数情况可不写
+# cursor:
+#   cmd: agent
+# openclaw:   # 需先安装 npm i -g openclaw 并运行 openclaw gateway
+#   cmd: openclaw
+#   thinking: off   # off | minimal | low | medium | high | xhigh
+# codex:
+#   cmd: codex
+#   skip_git_check: false
+# gemini:
+#   cmd: gemini
+# claude:
+#   cmd: claude
+#   model: sonnet
+#   max_turns: 10
+#   add_dir: /path/to/extra

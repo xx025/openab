@@ -5,13 +5,19 @@ import asyncio
 import os
 import shutil
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from openab.core.i18n import t
 
 
-def _find_cmd() -> str:
-    cmd = os.environ.get("GEMINI_CLI_CMD", "gemini")
+def _find_cmd(agent_config: dict[str, Any] | None = None) -> str:
+    cmd = "gemini"
+    if agent_config:
+        c = (agent_config.get("gemini") or {}).get("cmd")
+        if c:
+            cmd = str(c)
+    if not cmd:
+        cmd = os.environ.get("GEMINI_CLI_CMD", "gemini")
     if os.path.isabs(cmd):
         return cmd
     exe = shutil.which(cmd)
@@ -24,9 +30,10 @@ async def run_async(
     workspace: Optional[Path] = None,
     timeout: int = 300,
     lang: str = "en",
+    agent_config: Optional[dict[str, Any]] = None,
 ) -> str:
     """Gemini CLI: gemini -p \"prompt\" → stdout."""
-    cmd = _find_cmd()
+    cmd = _find_cmd(agent_config)
     args = [cmd, "-p", prompt]
     cwd = str(workspace) if workspace else None
     proc = await asyncio.create_subprocess_exec(

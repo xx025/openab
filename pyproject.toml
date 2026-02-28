@@ -4,15 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openab"
-version = "0.2.0"
+version = "0.3.0"
 description = "Open Agent Bridge — connect agent backends (CLIs, APIs) to chat platforms (Telegram, …)."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
 dependencies = [
     "python-telegram-bot>=21.0",
+    "discord.py>=2.3.0",
     "typer>=0.12.0",
     "python-dotenv>=1.0.0",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]

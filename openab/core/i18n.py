@@ -66,20 +66,28 @@ CLI_MESSAGES = {
     "zh": {
         "cli_help": "OpenAB — 开放智能体桥接",
         "opt_token": "Telegram Bot Token",
+        "opt_token_discord": "Discord Bot Token",
         "opt_workspace": "智能体工作目录",
         "opt_verbose": "打印调试日志",
         "run_help": "启动 Telegram 机器人（长轮询）。",
+        "run_discord_help": "启动 Discord 机器人。",
         "err_no_token": "错误: 请设置 TELEGRAM_BOT_TOKEN 或使用 --token 传入。",
+        "err_no_token_discord": "错误: 请设置 DISCORD_BOT_TOKEN 或使用 --token 传入。",
         "starting": "正在启动 OpenAB Telegram 机器人（长轮询）…",
+        "starting_discord": "正在启动 OpenAB Discord 机器人…",
     },
     "en": {
         "cli_help": "OpenAB — Open Agent Bridge",
         "opt_token": "Telegram Bot Token",
+        "opt_token_discord": "Discord Bot Token",
         "opt_workspace": "Agent workspace directory",
         "opt_verbose": "Enable verbose logging",
         "run_help": "Run Telegram bot (long polling).",
+        "run_discord_help": "Run Discord bot.",
         "err_no_token": "Error: Set TELEGRAM_BOT_TOKEN or pass --token.",
+        "err_no_token_discord": "Error: Set DISCORD_BOT_TOKEN or pass --token.",
         "starting": "Starting OpenAB Telegram bot (long polling)…",
+        "starting_discord": "Starting OpenAB Discord bot…",
     },
 }
 

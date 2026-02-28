@@ -1,0 +1,15 @@
+{
+  "agent": {
+    "backend": "cursor",
+    "timeout": 300
+  },
+  "openclaw": {},
+  "telegram": {
+    "bot_token": "",
+    "allowed_user_ids": []
+  },
+  "discord": {
+    "bot_token": "",
+    "allowed_user_ids": []
+  }
+}
