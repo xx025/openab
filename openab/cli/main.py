@@ -193,16 +193,18 @@ def _ensure_api_key(config: dict) -> dict:
 def _do_serve(
     host: Optional[str] = None,
     port: Optional[int] = None,
+    token: Optional[str] = None,
 ) -> None:
-    """启动 OpenAI API 兼容 HTTP 服务（供 run serve 与默认无配置时调用）。"""
+    """启动 OpenAI API 兼容 HTTP 服务（供 run serve 与默认无配置时调用）。token 覆盖配置中的 api.key。"""
     from openab.api import create_app
     import uvicorn
 
     config_path = get_config_file_path()
     config = load_config()
-    config = _ensure_api_key(config)
+    if not (token or "").strip():
+        config = _ensure_api_key(config)
     api_cfg = config.get("api") or {}
-    api_key = (api_cfg.get("key") or api_cfg.get("api_key")) or ""
+    api_key = (token or "").strip() or (api_cfg.get("key") or api_cfg.get("api_key")) or ""
     if isinstance(api_key, bool):
         api_key = ""
     api_key = (api_key or "").strip()
@@ -210,7 +212,7 @@ def _do_serve(
     bind_port = port if port is not None else (api_cfg.get("port") if api_cfg.get("port") is not None else 8000)
     bind_port = int(bind_port)
 
-    fastapi_app = create_app(config_path=config_path)
+    fastapi_app = create_app(config_path=config_path, api_key_override=token and token.strip() or None)
     typer.echo(cli_t("serve_listen", host=bind_host, port=bind_port))
     typer.echo(cli_t("api_key_display", api_key=api_key))
     uvicorn.run(fastapi_app, host=bind_host, port=bind_port)
@@ -220,7 +222,6 @@ def _do_serve(
 def _default(
     ctx: typer.Context,
     config: Optional[Path] = typer.Option(None, "--config", "-c", path_type=Path, help=cli_t("opt_config")),
-    token: Optional[str] = typer.Option(None, "--token", "-t", help=cli_t("opt_token")),
     workspace: Optional[Path] = typer.Option(None, "--workspace", "-w", path_type=Path, help=cli_t("opt_workspace")),
     verbose: bool = typer.Option(False, "--verbose", "-v", help=cli_t("opt_verbose")),
 ) -> None:
@@ -258,9 +259,10 @@ def _run_default(ctx: typer.Context) -> None:
 def run_serve(
     host: Optional[str] = typer.Option(None, "--host", "-H", help=cli_t("serve_opt_host")),
     port: Optional[int] = typer.Option(None, "--port", "-p", help=cli_t("serve_opt_port")),
+    token: Optional[str] = typer.Option(None, "--token", "-t", help=cli_t("serve_opt_token")),
 ) -> None:
     """Start OpenAI API compatible HTTP server (POST /v1/chat/completions, GET /v1/models)."""
-    _do_serve(host=host, port=port)
+    _do_serve(host=host, port=port, token=token)
 
 
 @run_app.command("telegram", help=cli_t("run_telegram_help"))

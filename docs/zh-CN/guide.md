@@ -28,16 +28,16 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 
 | 键 | 是否必填 | 说明 |
 |----|----------|------|
-| `telegram.bot_token` | 运行 `run` 时 | 来自 [@BotFather](https://t.me/BotFather) 的 Bot Token |
+| `telegram.bot_token` | 运行 `run telegram` 时 | 来自 [@BotFather](https://t.me/BotFather) 的 Bot Token；也可用 `openab run telegram --token <token>` 传入。 |
 | `telegram.allowed_user_ids` | 运行 `run` 时 | Telegram 用户 ID 列表。空则无人可用。用户可用 `/whoami` 查看自己的 ID。 |
-| `discord.bot_token` | 运行 `run discord` 时 | 来自 [Discord 开发者门户](https://discord.com/developers/applications) 的 Bot Token |
+| `discord.bot_token` | 运行 `run discord` 时 | 来自 [Discord 开发者门户](https://discord.com/developers/applications) 的 Bot Token；也可用 `openab run discord --token <token>` 传入。 |
 | `discord.allowed_user_ids` | 运行 `run discord` 时 | Discord 用户 ID 列表。空则无人可用。用户可在私信中用 `!whoami` 查看 ID。 |
 | `agent.backend` | 否 | `cursor`、`codex`、`gemini`、`claude`、`openclaw`（默认：`cursor`） |
 | `agent.workspace` | 否 | 智能体工作目录（默认：**用户家目录** `~`） |
 | `agent.timeout` | 否 | 超时秒数（默认：300） |
 | `cursor.cmd`、`codex.cmd`、`gemini.cmd`、`claude.cmd`、`openclaw.cmd` | 否 | 各后端对应的 CLI 可执行文件名 |
 | 各后端专用选项 | 否 | 如 `openclaw.thinking`（off \| minimal \| low \| medium \| high \| xhigh）、`claude.model`、`codex.skip_git_check` 等，见 [config.example.yaml](../../config.example.yaml)。 |
-| `api.key` | 否 | 若设置，访问 `openab run serve` 的请求需携带 `Authorization: Bearer <api.key>`。不设则仅限本地/无鉴权使用。 |
+| `api.key` | 否 | 若设置，访问 `openab run serve` 的请求需携带 `Authorization: Bearer <api.key>`。不设则仅限本地/无鉴权使用。也可用 `openab run serve --token <key>` 覆盖本次启动的 API key。 |
 | `api.host` | 否 | `openab run serve` 监听地址（默认 `127.0.0.1`），可用 `--host` 覆盖。 |
 | `api.port` | 否 | `openab run serve` 监听端口（默认 `8000`），可用 `--port` 覆盖。 |
 
@@ -48,7 +48,7 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 运行 `openab run serve` 可启动与 OpenAI 兼容的 HTTP 接口：
 
 - **端点：** `POST /v1/chat/completions`、`GET /v1/models`、`POST /v1/responses`
-- **鉴权：** 若在配置中设置了 `api.key`，请求需携带 `Authorization: Bearer <api.key>`。若未设置 `api.key`，首次启动时会自动生成并写入配置并打印（每次启动也会打印当前 key）。
+- **鉴权：** 若在配置中设置了 `api.key`，请求需携带 `Authorization: Bearer <api.key>`。使用 `openab run serve --token <key>` 可覆盖配置中的 API key（仅本次生效）。若未设置且未传 `--token`，首次启动时会自动生成并写入配置并打印（每次启动也会打印当前 key）。
 - **客户端：** 使用 `base_url=http://127.0.0.1:8000/v1` 与打印的 API key。最后一条用户消息会发给当前配置的智能体，回复以 `choices[0].message.content`（chat）或 `output_text` / `output[].content`（responses）返回。**流式：** chat completions 支持 `stream: true`（单块 SSE）。
 - **自助加白名单：** 在 Telegram 或 Discord 中，任何人发送与 `api.key` 完全一致的一条消息即可被加入该平台白名单并写回配置，无需重启。
 
@@ -71,16 +71,16 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 | 命令 | 说明 |
 |------|------|
 | `openab` | 无子命令时：先检查配置；若配置为空则提示并默认启动 API 服务（run serve），否则显示帮助。 |
-| `openab run serve` | 启动 OpenAI API 兼容 HTTP 服务（`POST /v1/chat/completions`、`GET /v1/models`）。可选 `--host`、`--port` 或配置 `api.host` / `api.port`。 |
-| `openab run telegram` | 运行 Telegram 机器人 |
-| `openab run discord` | 运行 Discord 机器人 |
+| `openab run serve` | 启动 OpenAI API 兼容 HTTP 服务（`POST /v1/chat/completions`、`GET /v1/models`）。可选 `--token`（API key）、`--host`、`--port` 或配置 `api.key` / `api.host` / `api.port`。 |
+| `openab run telegram` | 运行 Telegram 机器人。可选 `--token`、`--workspace`、`--verbose`。 |
+| `openab run discord` | 运行 Discord 机器人。可选 `--token`、`--workspace`、`--verbose`。 |
 | `openab run` | 未指定 run 目标时：同 `openab`（检查配置，空则 run serve，否则显示 run 帮助）。 |
 | `openab config path` | 打印配置文件路径 |
 | `openab config get [key]` | 显示配置或指定键的值 |
 | `openab config set <key> <value>` | 设置配置键并保存 |
 | `openab install-service` | 安装为 **Linux 用户级 systemd 服务**（可选 `--discord` 装 Discord、`--start` 立即启动）。**仅 Linux。** 在 macOS 上请直接运行 `openab run telegram` 或 `openab run discord`（或自行配置 launchd）。 |
 
-选项：`--config` / `-c` 指定配置文件；`run telegram` / `run discord` 可用 `--token`、`--workspace`、`--verbose`；`run serve` 可用 `--host`、`--port`。
+**全局选项**（如 `openab -c /path/config.yaml run telegram`）：`--config` / `-c` 配置文件路径；`--workspace` / `-w` 工作目录；`--verbose` / `-v` 调试日志。**子命令选项**：`run telegram` / `run discord` 支持 `--token` / `-t`（Bot Token）、`--workspace`、`--verbose`；`run serve` 支持 `--token` / `-t`（API key，覆盖配置）、`--host`、`--port`。
 
 ### Telegram 机器人
 

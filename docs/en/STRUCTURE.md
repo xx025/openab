@@ -63,4 +63,4 @@ LICENSE
 - **Add an agent:** Add `xxx.py` under `openab/agents/` with `async def run_async(prompt, *, workspace, timeout, lang) -> str`, and wire it in `agents/__init__.py` inside `run_agent_async` (by `agent.backend` / `OPENAB_AGENT`).
 - **Add a chat frontend:** Add a subpackage under `openab/chats/` (e.g. `discord/`), implement the bot or webhook, and add a subcommand under `run_app` in `openab/cli/main.py` (e.g. `openab run discord`).
 - **CLI subcommands:** Add with `@app.command()` or under `run_app` in `openab/cli/main.py`, or split into `openab/cli/run.py`, `openab/cli/config.py`, etc. and mount in `main.py`.
-- **OpenAI API server:** `openab run serve` runs `openab/api/app.py` (FastAPI) with uvicorn; config via `api.key` (optional Bearer auth).
+- **OpenAI API server:** `openab run serve` runs `openab/api/app.py` (FastAPI) with uvicorn; auth via config `api.key` or `--token` (API key override); `create_app(api_key_override=...)` for CLI override.

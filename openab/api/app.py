@@ -99,16 +99,19 @@ def create_app(
     *,
     config: Optional[dict[str, Any]] = None,
     config_path: Optional[Path] = None,
+    api_key_override: Optional[str] = None,
 ) -> FastAPI:
-    """创建 FastAPI 应用，使用给定配置或从 config_path 加载。"""
+    """创建 FastAPI 应用，使用给定配置或从 config_path 加载。api_key_override 可覆盖配置中的 api.key。"""
     if config is None:
         config = load_config(config_path) if config_path else load_config()
     workspace = resolve_workspace(config, None)
     timeout = int((config.get("agent") or {}).get("timeout") or 300)
-    api_key = (config.get("api") or {}).get("key") or (config.get("api") or {}).get("api_key")
-    if isinstance(api_key, bool):
-        api_key = None
-    api_key = (api_key or "").strip() or None
+    api_key = (api_key_override or "").strip() or None
+    if api_key is None:
+        api_key = (config.get("api") or {}).get("key") or (config.get("api") or {}).get("api_key")
+        if isinstance(api_key, bool):
+            api_key = None
+        api_key = (api_key or "").strip() or None
 
     app = FastAPI(title="OpenAB API", description="OpenAI Chat Completions & Responses API compatible")
     app.add_middleware(

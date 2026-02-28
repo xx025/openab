@@ -30,14 +30,14 @@ pip install openab
 # or: uv tool install openab
 ```
 
-**2. Config** — Put a YAML/JSON config in `~/.config/openab/` (see [config.example.yaml](config.example.yaml)). You need at least a bot token (Telegram/Discord) or nothing for API-only; allowlist or `api.key` for auth. Full options: [docs/en/guide.md](docs/en/guide.md).
+**2. Config** — Put a YAML/JSON config in `~/.config/openab/` (see [config.example.yaml](config.example.yaml)). You need at least a bot token (Telegram/Discord) or nothing for API-only; allowlist or `api.key` for auth. You can also pass tokens via CLI: `openab run telegram --token <token>`, `openab run serve --token <api_key>`. Full options: [docs/en/guide.md](docs/en/guide.md).
 
 **3. Run**
 
 ```bash
-openab run serve     # OpenAI-compatible API (POST /v1/chat/completions, GET /v1/models, POST /v1/responses)
-openab run telegram  # Telegram bot
-openab run discord   # Discord bot
+openab run serve     # OpenAI-compatible API (optional: --token, --host, --port)
+openab run telegram  # Telegram bot (optional: --token, --workspace, --verbose)
+openab run discord   # Discord bot (optional: --token, --workspace, --verbose)
 ```
 
 - No config? Run `openab` or `openab run` — you get a hint and the API server starts by default.

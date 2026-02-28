@@ -28,16 +28,16 @@ New keys are written to the existing config file (YAML or JSON by path); if no f
 
 | Key | Required | Description |
 |-----|----------|-------------|
-| `telegram.bot_token` | For `run` | Bot token from [@BotFather](https://t.me/BotFather) |
+| `telegram.bot_token` | For `run telegram` | Bot token from [@BotFather](https://t.me/BotFather); or pass with `openab run telegram --token <token>`. |
 | `telegram.allowed_user_ids` | For `run` | List of Telegram user IDs. Empty = nobody can use. Users get ID with `/whoami`. |
-| `discord.bot_token` | For `run discord` | Bot token from [Discord Developer Portal](https://discord.com/developers/applications) |
+| `discord.bot_token` | For `run discord` | Bot token from [Discord Developer Portal](https://discord.com/developers/applications); or pass with `openab run discord --token <token>`. |
 | `discord.allowed_user_ids` | For `run discord` | List of Discord user IDs. Empty = nobody. Users get ID with `!whoami` in DM. |
 | `agent.backend` | No | `cursor`, `codex`, `gemini`, `claude`, `openclaw` (default: `cursor`) |
 | `agent.workspace` | No | Agent working directory (default: **user home** `~`) |
 | `agent.timeout` | No | Timeout in seconds (default: 300) |
 | `cursor.cmd`, `codex.cmd`, `gemini.cmd`, `claude.cmd`, `openclaw.cmd` | No | CLI binary name for each backend |
 | Backend-specific options | No | e.g. `openclaw.thinking` (off \| minimal \| low \| medium \| high \| xhigh), `claude.model`, `codex.skip_git_check`, etc. See [config.example.yaml](../../config.example.yaml). |
-| `api.key` | No | If set, requests to `openab run serve` must send `Authorization: Bearer <api.key>`. Omit for local/unprotected use. |
+| `api.key` | No | If set, requests to `openab run serve` must send `Authorization: Bearer <api.key>`. Omit for local/unprotected use. You can override with `openab run serve --token <key>` for a single run. |
 | `api.host` | No | Bind host for `openab run serve` (default: `127.0.0.1`). Overridable with `--host`. |
 | `api.port` | No | Bind port for `openab run serve` (default: `8000`). Overridable with `--port`. |
 
@@ -48,7 +48,7 @@ New keys are written to the existing config file (YAML or JSON by path); if no f
 Run `openab run serve` to expose an HTTP API compatible with OpenAI:
 
 - **Endpoints:** `POST /v1/chat/completions`, `GET /v1/models`, `POST /v1/responses`
-- **Auth:** If `api.key` is set in config, requests must send `Authorization: Bearer <api.key>`. If `api.key` is missing, the server generates one at first start, writes it to config, and prints it (and prints it again on every start).
+- **Auth:** If `api.key` is set in config, requests must send `Authorization: Bearer <api.key>`. Use `openab run serve --token <key>` to override the API key for that run only. If neither is set, the server generates one at first start, writes it to config, and prints it (and prints it again on every start).
 - **Clients:** Use `base_url=http://127.0.0.1:8000/v1` and the API key. The last user message is sent to your configured agent; the reply is returned as `choices[0].message.content` (chat) or `output_text` / `output[].content` (responses). **Streaming:** `stream: true` is supported for chat completions (single-chunk SSE).
 - **Self-add allowlist:** In Telegram or Discord, any user can send the exact `api.key` (as a message) to be added to that platform’s allowlist automatically; the config is updated and no restart is needed.
 
@@ -71,16 +71,16 @@ Run `openab run serve` to expose an HTTP API compatible with OpenAI:
 | Command | Description |
 |---------|-------------|
 | `openab` | No subcommand: check config; if empty → prompt and start API server (run serve); else show help. |
-| `openab run serve` | Start OpenAI API compatible HTTP server (`POST /v1/chat/completions`, `GET /v1/models`). Optional: `--host`, `--port` or config `api.host` / `api.port`. |
-| `openab run telegram` | Run Telegram bot |
-| `openab run discord` | Run Discord bot |
+| `openab run serve` | Start OpenAI API compatible HTTP server (`POST /v1/chat/completions`, `GET /v1/models`). Optional: `--token` (API key), `--host`, `--port` or config `api.key` / `api.host` / `api.port`. |
+| `openab run telegram` | Run Telegram bot. Optional: `--token`, `--workspace`, `--verbose`. |
+| `openab run discord` | Run Discord bot. Optional: `--token`, `--workspace`, `--verbose`. |
 | `openab run` | No run target: same as `openab` (check config; if empty → run serve, else show run help). |
 | `openab config path` | Print config file path |
 | `openab config get [key]` | Show config or value at key |
 | `openab config set <key> <value>` | Set config key and save |
 | `openab install-service` | Install as a **Linux user-level systemd service** (optional: `--discord` for Discord, `--start` to start now). **Linux only.** On macOS run `openab run telegram` or `openab run discord` in the terminal (or configure launchd yourself). |
 
-Options: `--config` / `-c` for config path; for `run telegram` / `run discord` use `--token`, `--workspace`, `--verbose`; for `run serve` use `--host`, `--port`.
+**Global options** (e.g. `openab -c /path/config.yaml run telegram`): `--config` / `-c` config path; `--workspace` / `-w` workspace; `--verbose` / `-v` verbose logging. **Per-command options:** `run telegram` / `run discord` support `--token` / `-t` (bot token), `--workspace`, `--verbose`; `run serve` supports `--token` / `-t` (API key, overrides config), `--host`, `--port`.
 
 ### Telegram bot
 

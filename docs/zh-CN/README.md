@@ -30,14 +30,14 @@ pip install openab
 # 或：uv tool install openab
 ```
 
-**2. 配置** — 在 `~/.config/openab/` 下放一份 YAML/JSON 配置（参考 [config.example.yaml](../../config.example.yaml)）。至少需要机器人 token（Telegram/Discord）或仅用 API 可不配；白名单或 `api.key` 用于鉴权。完整选项见 [配置与使用说明](guide.md)。
+**2. 配置** — 在 `~/.config/openab/` 下放一份 YAML/JSON 配置（参考 [config.example.yaml](../../config.example.yaml)）。至少需要机器人 token（Telegram/Discord）或仅用 API 可不配；白名单或 `api.key` 用于鉴权。Bot token 也可通过 `--token` 传入（如 `openab run telegram --token <token>`）；API 服务可用 `openab run serve --token <key>` 指定本次 API key。完整选项见 [配置与使用说明](guide.md)。
 
 **3. 运行**
 
 ```bash
 openab run serve     # OpenAI 兼容 API（POST /v1/chat/completions、GET /v1/models、POST /v1/responses）
-openab run telegram  # Telegram 机器人
-openab run discord   # Discord 机器人
+openab run telegram  # Telegram 机器人（可选 --token、--workspace、--verbose）
+openab run discord   # Discord 机器人（可选 --token、--workspace、--verbose）
 ```
 
 - 无配置时运行 `openab` 或 `openab run` 会提示并默认启动 API 服务。
