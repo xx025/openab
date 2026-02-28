@@ -52,5 +52,9 @@ jobs:
         with:
           name: dist
 
+      # download-artifact 解压到工作区根目录，pypi-publish 需要 dist/*，故放入 dist/
+      - name: Prepare dist directory
+        run: mkdir -p dist && mv *.whl *.tar.gz dist/ 2>/dev/null || true
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
