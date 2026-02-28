@@ -1,110 +1,138 @@
-**中文说明 / Chinese:** [docs/README.zh-CN.md](docs/README.zh-CN.md)
-
----
-
 # OpenAB
 
-**Open** **A**gent **B**ridge — a bridge between **agent backends** (CLIs, APIs, …) and **chat platforms** (Telegram, Discord, Slack, …). Plug in the agents and chats you want; OpenAB routes messages between them. Use your agents from any device and any supported chat app.
+**Open Agent Bridge** — Connect AI agent backends (Cursor, Codex, Gemini, Claude, OpenClaw) to chat platforms (Telegram, Discord). One config, one bridge; use your agents from any supported chat app.
 
-| Agents (backends) | Chats (frontends) |
-|-------------------|-------------------|
-| [Cursor](https://cursor.com) CLI ✓ | Telegram ✓        |
-| [OpenAI Codex](https://github.com/openai/codex) ✓ | _more planned_    |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) ✓ |                   |
-| Claude CLI ✓      |                   |
-| _more planned_    |                   |
+[中文说明](docs/README.zh-CN.md)
 
 ---
 
-## Quick start: Agent × Telegram
+## What is OpenAB?
 
-The steps below run **one** built-in combination: one agent backend (Cursor or Codex) and Telegram.
-
-### Requirements
-
-1. **One agent CLI** installed and signed in:
-   - **Cursor:** `agent status` / `agent login`
-   - **Codex:** `npm i -g @openai/codex` or `brew install --cask codex`, then `codex` (or `CODEX_API_KEY`)
-   - **Gemini:** `npm i -g @google/gemini-cli` or `brew install gemini-cli`, then `gemini` (or `GEMINI_API_KEY`)
-   - **Claude:** use a CLI that supports `claude -p "prompt"` and set `OPENAB_AGENT=claude`, `CLAUDE_CLI_CMD` to the binary
-
-2. **Telegram Bot Token**  
-   Create a bot via [@BotFather](https://t.me/BotFather) and get the token.
-
-3. **[uv](https://docs.astral.sh/uv/)**（推荐）或 Python 3.10+
-
-### Install
-
-```bash
-git clone https://github.com/xx025/openab.git
-cd openab
-uv sync
-```
-
-（uv 会按 `.python-version` 创建虚拟环境并安装依赖；首次可先安装 [uv](https://docs.astral.sh/uv/)。）
-
-### Configuration
-
-Copy the example env file and edit:
-
-```bash
-cp .env.example .env
-# Edit .env: TELEGRAM_BOT_TOKEN, ALLOWED_USER_IDS
-```
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `TELEGRAM_BOT_TOKEN` | Yes | Bot token from BotFather |
-| `ALLOWED_USER_IDS` | Yes | Comma-separated Telegram user IDs. **If unset, no one can use the bot.** Users can send `/whoami` to get their ID. |
-| `OPENAB_AGENT` | No | Agent backend: `cursor` (default), `codex`, `gemini`, or `claude` |
-| `OPENAB_WORKSPACE` | No | Working directory for the agent (default: current dir). `CURSOR_WORKSPACE` is also accepted. |
-| `OPENAB_AGENT_TIMEOUT` | No | Timeout in seconds (default: 300) |
-| `CURSOR_AGENT_CMD` | No | Path to Cursor `agent` (default: `agent` in PATH) |
-| `CODEX_CMD` | No | Path to Codex CLI (default: `codex` in PATH). Uses `codex exec` non-interactively. |
-| `CODEX_SKIP_GIT_CHECK` | No | Set to `1` to run Codex outside a Git repo |
-| `GEMINI_CLI_CMD` | No | Path to Gemini CLI (default: `gemini` in PATH). Uses `gemini -p "prompt"`. |
-| `CLAUDE_CLI_CMD` | No | Path to Claude CLI (default: `claude` in PATH). Uses `claude -p "prompt"`. |
-
-### Run
-
-```bash
-uv run openab
-# Or with options
-uv run openab --token "YOUR_BOT_TOKEN" --workspace /path/to/project
-```
-
-Open your bot in Telegram and send text; OpenAB forwards it to the configured agent and replies (long replies are split into multiple messages).
+OpenAB sits between **agent backends** (CLIs / APIs you already use) and **chat frontends** (Telegram, Discord). You pick one agent and one or more chats; OpenAB forwards messages and returns agent replies. No need to run separate bots per agent — configure once and talk from Telegram or Discord.
 
 ---
 
-## Commands (Telegram)
+## Supported backends & chats
+
+| Agent backends | Chat frontends |
+|----------------|----------------|
+| [Cursor](https://cursor.com) CLI | **Telegram** |
+| [OpenAI Codex](https://github.com/openai/codex) | **Discord** |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | _more planned_ |
+| Claude CLI | |
+| [OpenClaw](https://github.com/openclaw/openclaw) | |
+
+---
+
+## Quick start
+
+### 1. Install
+
+**Python 3.10+** required.
+
+```bash
+# Option A: pip (recommended)
+pip install openab
+
+# Option B: uv tool (isolated env)
+uv tool install openab
+```
+
+From source (dev/unreleased):
+
+```bash
+git clone https://github.com/xx025/openab.git && cd openab && uv sync
+# Then: uv run openab
+```
+
+### 2. Configure
+
+OpenAB uses a **YAML or JSON** config file under your user directory. Only one env var is used for config: **`OPENAB_CONFIG`** (optional, to override config path).
+
+- Default config path: `~/.config/openab/config.yaml` (run `openab config-path` to print it).
+- Create `~/.config/openab/` and copy [config.example.yaml](config.example.yaml) or [config.example.json](config.example.json) as `config.yaml` or `config.json`.
+- Fill in at least:
+  - **Telegram:** `telegram.bot_token` (from [@BotFather](https://t.me/BotFather)), `telegram.allowed_user_ids` (list of user IDs; users get theirs with `/whoami`).
+  - **Discord:** `discord.bot_token` (from [Discord Developer Portal](https://discord.com/developers/applications)), `discord.allowed_user_ids` (users get ID with `!whoami` in DM).
+- **Agent:** `agent.backend` — `cursor` (default), `codex`, `gemini`, `claude`, or `openclaw`. Leave `agent.workspace` unset to use your **home directory**; use `--workspace` on the CLI to override.
+
+### 3. Run
+
+**Telegram:**
+
+```bash
+openab
+# or: openab run
+# With overrides: openab --token "YOUR_TOKEN" --workspace /path/to/dir
+```
+
+**Discord:**
+
+```bash
+openab run-discord
+# With overrides: openab run-discord --token "YOUR_TOKEN" --workspace /path/to/dir
+```
+
+From source use `uv run openab` / `uv run openab run-discord`.
+
+Open the bot in Telegram or Discord and send a message; OpenAB sends it to the configured agent and replies (long replies are split into multiple messages).
+
+---
+
+## Configuration reference
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `telegram.bot_token` | For `run` | Bot token from BotFather |
+| `telegram.allowed_user_ids` | For `run` | List of Telegram user IDs. Empty = nobody can use. |
+| `discord.bot_token` | For `run-discord` | Bot token from Discord Developer Portal |
+| `discord.allowed_user_ids` | For `run-discord` | List of Discord user IDs. Empty = nobody. |
+| `agent.backend` | No | `cursor`, `codex`, `gemini`, `claude`, `openclaw` (default: `cursor`) |
+| `agent.workspace` | No | Agent working directory (default: **user home** `~`) |
+| `agent.timeout` | No | Timeout in seconds (default: 300) |
+| `*.cmd` per backend | No | CLI binary name (e.g. `cursor.cmd`, `openclaw.cmd`). Optional backend options in config (e.g. `openclaw.thinking`). |
+
+Override config file path with env **`OPENAB_CONFIG`**.
+
+---
+
+## Agent backends (prerequisites)
+
+- **Cursor:** `agent status` / `agent login` (Cursor CLI).
+- **Codex:** `npm i -g @openai/codex` or `brew install --cask codex`; then `codex` or set API key.
+- **Gemini:** `npm i -g @google/gemini-cli` or `brew install gemini-cli`; then `gemini`.
+- **Claude:** CLI that supports `claude -p "prompt"`; set `agent.backend: claude`.
+- **OpenClaw:** `npm install -g openclaw`, then `openclaw onboard` and run the Gateway (`openclaw gateway` or daemon); set `agent.backend: openclaw`.
+
+---
+
+## Commands
+
+**CLI**
 
 | Command | Description |
 |---------|-------------|
-| `/start` | Welcome and auth status |
-| `/whoami` | Show your Telegram User ID (for allowlist) |
+| `openab` / `openab run` | Run Telegram bot |
+| `openab run-discord` | Run Discord bot |
+| `openab config-path` | Print default config path |
+
+**Telegram bot:** `/start` — welcome & auth; `/whoami` — show your user ID (for allowlist).
+
+**Discord bot:** `!start` — welcome & auth; `!whoami` — show your user ID. Any other message is sent to the agent (DM or channel where the bot can read).
 
 ---
 
-## Auth (allowlist)
+## Auth & security
 
-- **You must set** `ALLOWED_USER_IDS=id1,id2,...` in `.env` or the environment. If not set, everyone gets “Auth not configured” and cannot use the bot.
-- Only users whose IDs are in the list can send prompts to the agent.
-- Others get an “unauthorized” message. They can send `/whoami` to see their ID and ask you to add it.
-
----
-
-## i18n (English / 中文)
-
-- **Bot**: Language follows the user’s chat app language (e.g. Telegram `language_code`). Chinese (`zh*`) → 中文; otherwise English.
-- **CLI**: Follows `LANG` (e.g. `LANG=zh_CN.UTF-8` for 中文).
+- Only users listed in `telegram.allowed_user_ids` or `discord.allowed_user_ids` can send prompts; others get an “unauthorized” message.
+- Do not commit config files that contain tokens. Keep `~/.config/openab/config.yaml` (or your `OPENAB_CONFIG` path) private.
 
 ---
 
-## Security
+## i18n
 
-- Do not commit `.env` or tokens to the repo. `.gitignore` already excludes `.env`.
-- Always set `ALLOWED_USER_IDS` so only intended users can use the bot.
+- **Bot:** Language follows the chat app (e.g. Telegram `language_code`). `zh*` → 中文; otherwise English.
+- **CLI:** Follows `LANG` (e.g. `LANG=zh_CN.UTF-8` for 中文).
 
 ---
 
