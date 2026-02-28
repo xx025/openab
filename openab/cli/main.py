@@ -36,6 +36,19 @@ app = typer.Typer(
 )
 
 
+# 终端红色粗体（仅 TTY 时使用，避免污染日志）
+_CLI_RED = "\033[1;31m"
+_CLI_RESET = "\033[0m"
+
+
+def _echo_severe_warning(msg: str) -> None:
+    """向 stderr 输出严重警告，在 TTY 下使用红色粗体。"""
+    if sys.stderr.isatty():
+        typer.echo(_CLI_RED + msg + _CLI_RESET, err=True)
+    else:
+        typer.echo(msg, err=True)
+
+
 def _get_workspace(config: dict, workspace: Optional[Path]) -> Path:
     return resolve_workspace(config, workspace)
 
@@ -180,14 +193,19 @@ def run(
     ws = _get_workspace(config, workspace)
     timeout = (config.get("agent") or {}).get("timeout")
     timeout = int(timeout) if timeout is not None else 300
-    if not allowed:
+    allow_all = (config.get("telegram") or {}).get("allow_all") is True
+    if not allowed and not allow_all:
         typer.echo(cli_t("allowlist_empty_warning"), err=True)
+    if allow_all:
+        _echo_severe_warning(cli_t("allow_all_severe_warning"))
     typer.echo(cli_t("starting"))
     run_telegram_bot(
         t,
         workspace=ws,
         timeout=timeout,
         allowed_user_ids=allowed,
+        allow_all=allow_all,
+        config_path=get_config_file_path(),
         agent_config=config,
     )
 
@@ -209,14 +227,19 @@ def run_discord(
     ws = _get_workspace(config, workspace)
     timeout = (config.get("agent") or {}).get("timeout")
     timeout = int(timeout) if timeout is not None else 300
-    if not allowed:
+    allow_all = (config.get("discord") or {}).get("allow_all") is True
+    if not allowed and not allow_all:
         typer.echo(cli_t("allowlist_empty_warning"), err=True)
+    if allow_all:
+        _echo_severe_warning(cli_t("allow_all_severe_warning"))
     typer.echo(cli_t("starting_discord"))
     run_discord_bot(
         t,
         workspace=ws,
         timeout=timeout,
         allowed_user_ids=allowed,
+        allow_all=allow_all,
+        config_path=get_config_file_path(),
         agent_config=config,
     )
 

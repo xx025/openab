@@ -9,6 +9,7 @@ MESSAGES = {
             "发送 /whoami 可查看你的 User ID。"
         ),
         "unauthorized_cli_hint": "管理员可运行：{cmd}",
+        "auth_allow_all_hint": "管理员也可在配置中设置 telegram.allow_all: true 开放给所有人使用。",
         "start_welcome": (
             "你好，这是 OpenAB 机器人。\n\n"
             "直接发送任意文字，我会把它交给已配置的智能体处理并回复你。\n\n"
@@ -26,9 +27,10 @@ MESSAGES = {
         "agent_timeout": "⏱ 执行超时，请缩短问题或稍后重试。",
         "agent_no_output": "（无文本输出）",
         "auth_not_configured": (
-            "管理员尚未配置鉴权白名单（ALLOWED_USER_IDS），机器人暂不可用。\n\n"
-            "发送 /whoami 可查看你的 User ID，提供给管理员配置后即可开放使用。"
+            "管理员尚未配置鉴权白名单，机器人暂不可用。\n\n"
+            "发送 /whoami 可查看你的 User ID，提供给管理员。"
         ),
+        "auth_allow_all_hint_discord": "管理员也可在配置中设置 discord.allow_all: true 开放给所有人使用。",
     },
     "en": {
         "unauthorized": (
@@ -37,6 +39,7 @@ MESSAGES = {
             "Send /whoami to see your User ID."
         ),
         "unauthorized_cli_hint": "Admin can run: {cmd}",
+        "auth_allow_all_hint": "Admin can also set telegram.allow_all: true in config to open to everyone.",
         "start_welcome": (
             "Hi, this is the OpenAB bot.\n\n"
             "Send any text and I'll pass it to the configured agent and reply with the result.\n\n"
@@ -54,8 +57,9 @@ MESSAGES = {
         "agent_timeout": "⏱ Request timed out. Try a shorter prompt or try again later.",
         "agent_no_output": "(no text output)",
         "auth_not_configured": (
-            "Auth allowlist (ALLOWED_USER_IDS) is not configured yet. The bot is not available.\n\n"
-            "Send /whoami to see your User ID and ask the admin to configure it."
+            "Auth allowlist is not configured yet. The bot is not available.\n\n"
+            "Send /whoami to see your User ID and ask the admin."
         ),
+        "auth_allow_all_hint_discord": "Admin can also set discord.allow_all: true in config to open to everyone.",
     },
 }

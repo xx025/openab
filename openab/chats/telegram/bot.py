@@ -3,13 +3,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 from pathlib import Path
 from typing import Any, Optional
 
 from telegram import Update
 from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters
+from telegram.error import Conflict
 
 from openab.agents import run_agent_async
+from openab.core.config import load_config, parse_allowed_user_ids
 from openab.core.i18n import lang_from_telegram, t
 
 logger = logging.getLogger(__name__)
@@ -53,7 +56,27 @@ def _user_lang(update: Update) -> str:
 
 
 def _allowed(context: ContextTypes.DEFAULT_TYPE) -> frozenset[int]:
+    """白名单：若配置了 config_path 则每次从文件重新读取，实现动态生效。"""
+    path = context.bot_data.get("openab_config_path")
+    if path is not None and path.is_file():
+        try:
+            cfg = load_config(path)
+            return parse_allowed_user_ids((cfg.get("telegram") or {}).get("allowed_user_ids"))
+        except Exception:
+            pass
     return context.bot_data.get("openab_allowed_user_ids") or frozenset()
+
+
+def _allow_all(context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """若配置了 config_path 则每次从文件重新读取。"""
+    path = context.bot_data.get("openab_config_path")
+    if path is not None and path.is_file():
+        try:
+            cfg = load_config(path)
+            return (cfg.get("telegram") or {}).get("allow_all") is True
+        except Exception:
+            pass
+    return context.bot_data.get("openab_allow_all") is True
 
 
 def _is_auth_enabled(context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -61,6 +84,8 @@ def _is_auth_enabled(context: ContextTypes.DEFAULT_TYPE) -> bool:
 
 
 def _is_user_allowed(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    if _allow_all(context):
+        return True
     return user_id in _allowed(context)
 
 
@@ -75,6 +100,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         key = "auth_not_configured" if not _is_auth_enabled(context) else "unauthorized"
         msg = t(lang, key) + "\n\n" + t(lang, "your_user_id") + f"<code>{user_id}</code>"
         msg += "\n\n" + t(lang, "unauthorized_cli_hint", cmd=f"openab allowlist add {user_id}")
+        msg += "\n\n" + t(lang, "auth_allow_all_hint")
     await update.message.reply_text(msg, parse_mode="HTML")
 
 
@@ -103,6 +129,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         key = "auth_not_configured" if not _is_auth_enabled(context) else "unauthorized"
         msg = t(lang, key) + "\n\n" + t(lang, "your_user_id") + f"<code>{user_id}</code>"
         msg += "\n\n" + t(lang, "unauthorized_cli_hint", cmd=f"openab allowlist add {user_id}")
+        msg += "\n\n" + t(lang, "auth_allow_all_hint")
         await update.message.reply_text(msg, parse_mode="HTML")
         return
 
@@ -142,22 +169,39 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text(chunk)
 
 
+def _error_handler(update: Optional[Update], context: ContextTypes.DEFAULT_TYPE) -> None:
+    """统一错误处理：Conflict 时提示并退出，其余记录日志。"""
+    err = context.error
+    if isinstance(err, Conflict):
+        logger.error(
+            "Telegram Conflict: another bot instance is running with the same token. "
+            "Stop other instances (e.g. pkill -f 'openab run'), wait a few seconds, then start again."
+        )
+        sys.exit(1)
+    logger.exception("Bot error: %s", err, exc_info=err)
+
+
 def build_application(
     token: str,
     *,
     workspace: Path,
     timeout: int = 300,
     allowed_user_ids: frozenset[int],
+    allow_all: bool = False,
+    config_path: Optional[Path] = None,
     agent_config: Optional[dict[str, Any]] = None,
 ) -> Application:
     app = Application.builder().token(token).build()
     app.bot_data["openab_workspace"] = workspace
     app.bot_data["openab_timeout"] = timeout
     app.bot_data["openab_allowed_user_ids"] = allowed_user_ids
+    app.bot_data["openab_allow_all"] = allow_all
+    app.bot_data["openab_config_path"] = Path(config_path).resolve() if config_path else None
     app.bot_data["openab_agent_config"] = agent_config or {}
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("whoami", cmd_whoami))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_error_handler(_error_handler)
     return app
 
 
@@ -167,6 +211,8 @@ def run_bot(
     workspace: Path,
     timeout: int = 300,
     allowed_user_ids: Optional[frozenset[int]] = None,
+    allow_all: bool = False,
+    config_path: Optional[Path] = None,
     agent_config: Optional[dict[str, Any]] = None,
 ) -> None:
     ids = allowed_user_ids or frozenset()
@@ -175,6 +221,8 @@ def run_bot(
         workspace=workspace,
         timeout=timeout,
         allowed_user_ids=ids,
+        allow_all=allow_all,
+        config_path=config_path,
         agent_config=agent_config,
     )
     app.run_polling(allowed_updates=Update.ALL_TYPES)

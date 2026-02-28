@@ -10,6 +10,7 @@ import discord
 from discord import Intents
 
 from openab.agents import run_agent_async
+from openab.core.config import load_config, parse_allowed_user_ids
 from openab.core.i18n import lang_from_env, t
 
 logger = logging.getLogger(__name__)
@@ -53,20 +54,40 @@ class OpenABDiscordBot(discord.Client):
         *,
         intents: Intents,
         allowed_user_ids: frozenset[int],
+        allow_all: bool = False,
+        config_path: Optional[Path] = None,
         workspace: Path,
         timeout: int = 300,
         agent_config: Optional[dict[str, Any]] = None,
     ) -> None:
         super().__init__(intents=intents)
         self._openab_allowed = allowed_user_ids
+        self._openab_allow_all = allow_all
+        self._openab_config_path = Path(config_path).resolve() if config_path else None
         self._openab_workspace = workspace
         self._openab_timeout = timeout
         self._openab_agent_config = agent_config or {}
 
+    def _refresh_allow_from_config(self) -> None:
+        """从配置文件重新读取白名单与 allow_all，使 allowlist add 动态生效。"""
+        if self._openab_config_path is None or not self._openab_config_path.is_file():
+            return
+        try:
+            cfg = load_config(self._openab_config_path)
+            dc = cfg.get("discord") or {}
+            self._openab_allowed = parse_allowed_user_ids(dc.get("allowed_user_ids"))
+            self._openab_allow_all = dc.get("allow_all") is True
+        except Exception:
+            pass
+
     def _is_user_allowed(self, user_id: int) -> bool:
+        self._refresh_allow_from_config()
+        if self._openab_allow_all:
+            return True
         return user_id in self._openab_allowed
 
     def _is_auth_enabled(self) -> bool:
+        self._refresh_allow_from_config()
         return len(self._openab_allowed) > 0
 
     async def handle_command_start(self, message: discord.Message) -> None:
@@ -78,6 +99,7 @@ class OpenABDiscordBot(discord.Client):
             key = "auth_not_configured" if not self._is_auth_enabled() else "unauthorized"
             msg = t(lang, key) + "\n\n" + t(lang, "your_user_id") + str(user_id)
             msg += "\n\n" + t(lang, "unauthorized_cli_hint", cmd=f"openab allowlist add --discord {user_id}")
+            msg += "\n\n" + t(lang, "auth_allow_all_hint_discord")
         await message.reply(msg)
 
     async def handle_command_whoami(self, message: discord.Message) -> None:
@@ -99,6 +121,7 @@ class OpenABDiscordBot(discord.Client):
             key = "auth_not_configured" if not self._is_auth_enabled() else "unauthorized"
             msg = t(lang, key) + "\n\n" + t(lang, "your_user_id") + str(user_id)
             msg += "\n\n" + t(lang, "unauthorized_cli_hint", cmd=f"openab allowlist add --discord {user_id}")
+            msg += "\n\n" + t(lang, "auth_allow_all_hint_discord")
             await message.reply(msg)
             return
 
@@ -154,6 +177,8 @@ def run_bot(
     workspace: Path,
     timeout: int = 300,
     allowed_user_ids: Optional[frozenset[int]] = None,
+    allow_all: bool = False,
+    config_path: Optional[Path] = None,
     agent_config: Optional[dict[str, Any]] = None,
 ) -> None:
     ids = allowed_user_ids or frozenset()
@@ -162,6 +187,8 @@ def run_bot(
     client = OpenABDiscordBot(
         intents=intents,
         allowed_user_ids=ids,
+        allow_all=allow_all,
+        config_path=config_path,
         workspace=workspace,
         timeout=timeout,
         agent_config=agent_config,
