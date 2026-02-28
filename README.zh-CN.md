@@ -2,13 +2,22 @@
 
 ---
 
-# Cursor CLI × Telegram 机器人
+# OpenAB
 
-将 [Cursor Agent CLI](https://cursor.com) 对接到 Telegram，在手机或任意设备上通过对话使用 Cursor 的 AI。
+**Open** **A**gent **B**ridge（开放智能体桥接）—— 连接**智能体后端**（CLI、API 等）与**聊天平台**（Telegram、Discord、Slack 等）的桥接。接入你需要的智能体和聊天应用，由 OpenAB 在中间转发消息，在任意设备、任意支持的聊天应用里使用你的智能体。
+
+| 智能体（后端） | 聊天（前端） |
+|---------------|--------------|
+| Cursor CLI ✓  | Telegram ✓   |
+| _更多计划中_  | _更多计划中_ |
 
 ---
 
-## 前置条件
+## 快速开始：智能体 × Telegram
+
+以下步骤以**当前内置的一种组合**为例：一个智能体后端（Cursor CLI）+ Telegram。其他组合后续会陆续加入。
+
+### 前置条件
 
 1. **Cursor Agent CLI** 已安装并登录  
    ```bash
@@ -21,18 +30,15 @@
 
 3. **Python 3.10+**
 
----
-
-## 安装
+### 安装
 
 ```bash
-cd cursor-telegram-bot
+git clone https://github.com/xx025/openab.git
+cd openab
 pip install -r requirements.txt
 ```
 
----
-
-## 配置
+### 配置
 
 复制示例环境文件并编辑：
 
@@ -49,9 +55,7 @@ cp .env.example .env
 | `CURSOR_WORKSPACE` | 否 | Agent 工作目录（默认当前目录） |
 | `CURSOR_AGENT_TIMEOUT` | 否 | 单次执行超时秒数（默认 300） |
 
----
-
-## 运行
+### 运行
 
 ```bash
 # 长轮询（无需公网）
@@ -61,11 +65,11 @@ python -m cursor_telegram_bot
 python -m cursor_telegram_bot --token "你的TOKEN" --workspace /path/to/project
 ```
 
-在 Telegram 中打开机器人并发送文字即可；内容会交给 Cursor Agent 处理，回复会分条发回。
+在 Telegram 中打开机器人并发送文字即可；OpenAB 会将内容交给已配置的智能体处理，回复会分条发回。
 
 ---
 
-## 命令
+## 命令（Telegram）
 
 | 命令 | 说明 |
 |------|------|
@@ -77,14 +81,14 @@ python -m cursor_telegram_bot --token "你的TOKEN" --workspace /path/to/project
 ## 鉴权（白名单）
 
 - **必须**在 `.env` 或环境中设置 `ALLOWED_USER_IDS=id1,id2,...`。未配置时所有人会看到「鉴权未配置」且无法使用。
-- 只有白名单内的用户可向 Cursor Agent 发送内容。
+- 只有白名单内的用户可向智能体发送内容。
 - 其他用户会收到「未授权」提示，可发送 `/whoami` 查看自己的 ID 并请管理员加入白名单。
 
 ---
 
 ## 中英文
 
-- **机器人**：按用户 Telegram 语言（`language_code`）自动选择，中文（`zh*`）显示中文，否则英文。
+- **机器人**：按用户聊天应用语言（如 Telegram 的 `language_code`）自动选择，中文（`zh*`）显示中文，否则英文。
 - **命令行**：按环境变量 `LANG`（如 `LANG=zh_CN.UTF-8` 为中文）。
 
 ---
