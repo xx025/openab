@@ -12,6 +12,7 @@ from discord.ext import commands
 
 from openab.agents import run_agent_async
 from openab.core.config import load_config, parse_allowed_user_ids, try_add_allowlist_by_api_token
+from openab.core.cursor_chats import list_cursor_sessions
 from openab.core.cursor_session_state import (
     set_new_session_next,
     set_resume_id,
@@ -23,6 +24,67 @@ logger = logging.getLogger(__name__)
 
 MAX_MESSAGE_LENGTH = 2000
 PREFIX = "!"
+
+
+class _ResumeChoiceView(discord.ui.View):
+    """Resume 按钮：延续上一会话、创建新会话、以及历史会话列表（从 ~/.cursor/chats 读取）。"""
+
+    def __init__(
+        self,
+        bot: "OpenABDiscordBot",
+        lang: str,
+        *,
+        timeout: float = 60.0,
+        sessions: Optional[list[tuple[str, str]]] = None,
+    ) -> None:
+        super().__init__(timeout=timeout)
+        self._openab_bot = bot
+        self._lang = lang
+        for child in self.children:
+            if isinstance(child, discord.ui.Button):
+                if child.custom_id == "openab_resume_latest":
+                    child.label = t(lang, "btn_resume_latest")
+                elif child.custom_id == "openab_new_session":
+                    child.label = t(lang, "btn_new_session")
+        for row_idx, (session_id, display_name) in enumerate(sessions or [], start=0):
+            btn = discord.ui.Button(
+                label=(display_name[:80] if len(display_name) > 80 else display_name),
+                custom_id=f"openab_resume:{session_id}",
+                row=min(1 + row_idx // 5, 4),
+            )
+            btn.callback = self._make_resume_session_callback(session_id)
+            self.add_item(btn)
+
+    def _make_resume_session_callback(self, session_id: str):
+        async def callback(interaction: discord.Interaction) -> None:
+            if not interaction.user:
+                return
+            if not self._openab_bot._is_user_allowed(interaction.user.id):
+                await interaction.response.send_message(t(self._lang, "unauthorized"), ephemeral=True)
+                return
+            set_resume_id("dc", interaction.channel_id or 0, interaction.user.id, session_id)
+            await interaction.response.send_message(t(self._lang, "session_resume_switched", id=session_id))
+        return callback
+
+    @discord.ui.button(label=".", custom_id="openab_resume_latest", row=0)
+    async def btn_resume_latest(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        if not interaction.user:
+            return
+        if not self._openab_bot._is_user_allowed(interaction.user.id):
+            await interaction.response.send_message(t(self._lang, "unauthorized"), ephemeral=True)
+            return
+        set_resume_id("dc", interaction.channel_id or 0, interaction.user.id, None)
+        await interaction.response.send_message(t(self._lang, "session_resume_latest"))
+
+    @discord.ui.button(label=".", custom_id="openab_new_session", row=0)
+    async def btn_new_session(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        if not interaction.user:
+            return
+        if not self._openab_bot._is_user_allowed(interaction.user.id):
+            await interaction.response.send_message(t(self._lang, "unauthorized"), ephemeral=True)
+            return
+        set_new_session_next("dc", interaction.channel_id or 0, interaction.user.id)
+        await interaction.response.send_message(t(self._lang, "session_new_created"))
 
 
 def _split_message(text: str, max_len: int = MAX_MESSAGE_LENGTH) -> list[str]:
@@ -160,7 +222,7 @@ class OpenABDiscordBot(commands.Bot):
         await message.reply(t(_user_lang(message), "session_new_created"))
 
     async def handle_command_resume(self, message: discord.Message) -> None:
-        """!resume [会话ID]：不填则恢复延续上一会话；填则切换到该会话。"""
+        """!resume [会话ID] 或点击按钮选择。"""
         if not self._is_user_allowed(message.author.id):
             await message.reply(t(_user_lang(message), "unauthorized"))
             return
@@ -171,8 +233,9 @@ class OpenABDiscordBot(commands.Bot):
             set_resume_id("dc", message.channel.id, message.author.id, session_id)
             await message.reply(t(lang, "session_resume_switched", id=session_id))
         else:
-            set_resume_id("dc", message.channel.id, message.author.id, None)
-            await message.reply(t(lang, "session_resume_latest"))
+            sessions = list_cursor_sessions(max_sessions=12)
+            view = _ResumeChoiceView(self, lang, sessions=sessions)
+            await message.reply(t(lang, "session_resume_choose"), view=view)
 
     async def handle_command_sessions(self, message: discord.Message) -> None:
         """列出会话说明。"""
@@ -226,8 +289,9 @@ class OpenABDiscordBot(commands.Bot):
             set_resume_id("dc", ch_id, interaction.user.id, sid)
             await interaction.response.send_message(t(lang, "session_resume_switched", id=sid))
         else:
-            set_resume_id("dc", ch_id, interaction.user.id, None)
-            await interaction.response.send_message(t(lang, "session_resume_latest"))
+            sessions = list_cursor_sessions(max_sessions=12)
+            view = _ResumeChoiceView(self, lang, sessions=sessions)
+            await interaction.response.send_message(t(lang, "session_resume_choose"), view=view)
 
     async def _slash_sessions(self, interaction: discord.Interaction) -> None:
         if not interaction.user:

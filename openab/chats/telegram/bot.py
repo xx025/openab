@@ -7,12 +7,13 @@ import sys
 from pathlib import Path
 from typing import Any, Optional
 
-from telegram import Update, BotCommand
-from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters
+from telegram import Update, BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from telegram.error import Conflict
 
 from openab.agents import run_agent_async
 from openab.core.config import load_config, parse_allowed_user_ids, try_add_allowlist_by_api_token
+from openab.core.cursor_chats import list_cursor_sessions
 from openab.core.cursor_session_state import (
     set_new_session_next,
     set_resume_id,
@@ -140,7 +141,7 @@ async def cmd_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """切换/恢复会话：/resume [会话ID]，不填则恢复为延续上一会话。"""
+    """切换/恢复会话：/resume [会话ID] 或点击下方按钮。"""
     if not update.message or not update.effective_user or not update.effective_chat:
         return
     user_id = update.effective_user.id
@@ -150,14 +151,46 @@ async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await update.message.reply_text(t(lang, "unauthorized"))
         return
     args = (update.message.text or "").strip().split()
-    # args[0] is /resume, args[1] optional session id
     session_id = args[1].strip() if len(args) > 1 else None
     if session_id:
         set_resume_id("tg", chat_id, user_id, session_id)
         await update.message.reply_text(t(lang, "session_resume_switched", id=session_id))
     else:
+        keyboard = [
+            [
+                InlineKeyboardButton(t(lang, "btn_resume_latest"), callback_data="resume_latest"),
+                InlineKeyboardButton(t(lang, "btn_new_session"), callback_data="new_session"),
+            ],
+        ]
+        for session_id, display_name in list_cursor_sessions(max_sessions=12):
+            keyboard.append([InlineKeyboardButton(display_name, callback_data=f"resume:{session_id}")])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(t(lang, "session_resume_choose"), reply_markup=reply_markup)
+
+
+async def handle_resume_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """处理 /resume 下方的按钮点击。"""
+    query = update.callback_query
+    if not query or not query.data or not query.from_user or not query.message:
+        return
+    await query.answer()
+    user_id = query.from_user.id
+    chat_id = query.message.chat.id if query.message.chat else 0
+    lang = _user_lang(update)
+    if not _is_user_allowed(user_id, context):
+        await query.edit_message_text(t(lang, "unauthorized"))
+        return
+    if query.data == "resume_latest":
         set_resume_id("tg", chat_id, user_id, None)
-        await update.message.reply_text(t(lang, "session_resume_latest"))
+        await query.edit_message_text(t(lang, "session_resume_latest"))
+    elif query.data == "new_session":
+        set_new_session_next("tg", chat_id, user_id)
+        await query.edit_message_text(t(lang, "session_new_created"))
+    elif query.data.startswith("resume:"):
+        session_id = query.data[7:].strip()
+        if session_id:
+            set_resume_id("tg", chat_id, user_id, session_id)
+            await query.edit_message_text(t(lang, "session_resume_switched", id=session_id))
 
 
 async def cmd_sessions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -292,6 +325,7 @@ def build_application(
     app.add_handler(CommandHandler("new", cmd_new))
     app.add_handler(CommandHandler("resume", cmd_resume))
     app.add_handler(CommandHandler("sessions", cmd_sessions))
+    app.add_handler(CallbackQueryHandler(handle_resume_callback, pattern="^resume_latest$|^new_session$|^resume:"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_error_handler(_error_handler)
     return app
