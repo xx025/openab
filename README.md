@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="assets/icon.png" width="256" alt="OpenAB" />
+  <img src="https://raw.githubusercontent.com/xx025/openab/main/assets/icon.png" width="256" alt="OpenAB" />
 </p>
 
 # OpenAB
 
 **Open Agent Bridge** — Connect AI agents (Cursor, Codex, Gemini, Claude, OpenClaw) to chat platforms. One config, one bridge.
 
-[中文](docs/README.zh-CN.md) · [Configuration & usage](docs/guide.md)
+[中文](https://github.com/xx025/openab/blob/main/docs/README.zh-CN.md) · [Configuration & usage](https://github.com/xx025/openab/blob/main/docs/guide.md)
 
 ---
 
@@ -29,7 +29,7 @@ pip install openab
 # or: uv tool install openab
 ```
 
-**2. Config** — Put a YAML/JSON config in `~/.config/openab/` (see [config.example.yaml](config.example.yaml)). You need at least a bot token and an allowlist of user IDs. Full options: [docs/guide.md](docs/guide.md).
+**2. Config** — Put a YAML/JSON config in `~/.config/openab/` (see [config.example.yaml](https://github.com/xx025/openab/blob/main/config.example.yaml)). You need at least a bot token and an allowlist of user IDs. Full options: [docs/guide.md](https://github.com/xx025/openab/blob/main/docs/guide.md).
 
 **3. Run**
 
@@ -44,10 +44,10 @@ Then open the bot in your chat app and send a message.
 
 ## Docs
 
-- **[Configuration & usage](docs/guide.md)** — Config keys, agent setup, commands, security, i18n.
+- **[Configuration & usage](https://github.com/xx025/openab/blob/main/docs/guide.md)** — Config keys, agent setup, commands, security, i18n.
 
 ---
 
 ## License
 
-MIT — [LICENSE](LICENSE)
+MIT — [LICENSE](https://github.com/xx025/openab/blob/main/LICENSE)
