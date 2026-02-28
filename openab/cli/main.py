@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 import subprocess
 import sys
 from pathlib import Path
@@ -51,6 +52,13 @@ def _echo_severe_warning(msg: str) -> None:
 
 def _get_workspace(config: dict, workspace: Optional[Path]) -> Path:
     return resolve_workspace(config, workspace)
+
+
+def _config_empty(config: dict) -> bool:
+    """配置为空或未配置（无 Telegram/Discord token）时视为空，可默认 run serve。"""
+    tg = (config.get("telegram") or {}).get("bot_token") or ""
+    dc = (config.get("discord") or {}).get("bot_token") or ""
+    return (not (tg and str(tg).strip())) and (not (dc and str(dc).strip()))
 
 
 def _is_interactive() -> bool:
@@ -162,6 +170,52 @@ def _ensure_discord_run_config(
     return (t, allowed, config)
 
 
+def _ensure_api_key(config: dict) -> dict:
+    """若配置中无 api.key 则生成随机 token 并写入配置文件，返回可能已修改的 config。"""
+    api_cfg = config.get("api")
+    if api_cfg is None:
+        api_cfg = {}
+        config["api"] = api_cfg
+    existing = (api_cfg.get("key") or api_cfg.get("api_key")) or ""
+    if isinstance(existing, bool):
+        existing = ""
+    existing = (existing or "").strip()
+    if existing:
+        return config
+    new_key = secrets.token_urlsafe(32)
+    api_cfg["key"] = new_key
+    get_config_path().parent.mkdir(parents=True, exist_ok=True)
+    save_config(config)
+    typer.echo(cli_t("api_key_generated", api_key=new_key, config_path=str(get_config_file_path())))
+    return config
+
+
+def _do_serve(
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+) -> None:
+    """启动 OpenAI API 兼容 HTTP 服务（供 run serve 与默认无配置时调用）。"""
+    from openab.api import create_app
+    import uvicorn
+
+    config_path = get_config_file_path()
+    config = load_config()
+    config = _ensure_api_key(config)
+    api_cfg = config.get("api") or {}
+    api_key = (api_cfg.get("key") or api_cfg.get("api_key")) or ""
+    if isinstance(api_key, bool):
+        api_key = ""
+    api_key = (api_key or "").strip()
+    bind_host = host if host is not None else api_cfg.get("host") or "127.0.0.1"
+    bind_port = port if port is not None else (api_cfg.get("port") if api_cfg.get("port") is not None else 8000)
+    bind_port = int(bind_port)
+
+    fastapi_app = create_app(config_path=config_path)
+    typer.echo(cli_t("serve_listen", host=bind_host, port=bind_port))
+    typer.echo(cli_t("api_key_display", api_key=api_key))
+    uvicorn.run(fastapi_app, host=bind_host, port=bind_port)
+
+
 @app.callback(invoke_without_command=True)
 def _default(
     ctx: typer.Context,
@@ -172,12 +226,45 @@ def _default(
 ) -> None:
     if config is not None:
         os.environ["OPENAB_CONFIG"] = str(config.expanduser().resolve())
-    if ctx.invoked_subcommand is None:
-        ctx.invoke(run, token=token, workspace=workspace, verbose=verbose)
+    if ctx.invoked_subcommand is not None:
+        return
+    # 无子命令：先检查配置，若什么都没有则提示并默认 run serve
+    cfg = load_config()
+    if _config_empty(cfg):
+        typer.echo(cli_t("default_no_config_run_serve"))
+        _do_serve()
+    else:
+        typer.echo(cli_t("default_show_help"))
+        raise typer.Exit(0)
 
 
-@app.command("run", help=cli_t("run_help"))
-def run(
+run_app = typer.Typer(help=cli_t("run_help"), no_args_is_help=False, invoke_without_command=True)
+
+
+@run_app.callback()
+def _run_default(ctx: typer.Context) -> None:
+    if ctx.invoked_subcommand is not None:
+        return
+    cfg = load_config()
+    if _config_empty(cfg):
+        typer.echo(cli_t("default_no_config_run_serve"))
+        _do_serve()
+    else:
+        typer.echo(cli_t("default_show_help_run"))
+        raise typer.Exit(0)
+
+
+@run_app.command("serve", help=cli_t("run_serve_help"))
+def run_serve(
+    host: Optional[str] = typer.Option(None, "--host", "-H", help=cli_t("serve_opt_host")),
+    port: Optional[int] = typer.Option(None, "--port", "-p", help=cli_t("serve_opt_port")),
+) -> None:
+    """Start OpenAI API compatible HTTP server (POST /v1/chat/completions, GET /v1/models)."""
+    _do_serve(host=host, port=port)
+
+
+@run_app.command("telegram", help=cli_t("run_telegram_help"))
+def run_telegram(
     token: Optional[str] = typer.Option(None, "--token", "-t", help=cli_t("opt_token")),
     workspace: Optional[Path] = typer.Option(None, "--workspace", "-w", path_type=Path, help=cli_t("opt_workspace")),
     verbose: bool = typer.Option(False, "--verbose", "-v", help=cli_t("opt_verbose")),
@@ -210,7 +297,7 @@ def run(
     )
 
 
-@app.command("run-discord", help=cli_t("run_discord_help"))
+@run_app.command("discord", help=cli_t("run_discord_help"))
 def run_discord(
     token: Optional[str] = typer.Option(None, "--token", "-t", help=cli_t("opt_token_discord")),
     workspace: Optional[Path] = typer.Option(None, "--workspace", "-w", path_type=Path, help=cli_t("opt_workspace")),
@@ -242,6 +329,9 @@ def run_discord(
         config_path=get_config_file_path(),
         agent_config=config,
     )
+
+
+app.add_typer(run_app, name="run")
 
 
 config_app = typer.Typer(help="Read or write config file (YAML/JSON).")

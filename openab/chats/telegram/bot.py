@@ -12,7 +12,7 @@ from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandl
 from telegram.error import Conflict
 
 from openab.agents import run_agent_async
-from openab.core.config import load_config, parse_allowed_user_ids
+from openab.core.config import load_config, parse_allowed_user_ids, try_add_allowlist_by_api_token
 from openab.core.i18n import lang_from_telegram, t
 
 logger = logging.getLogger(__name__)
@@ -125,6 +125,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
     user_id = update.effective_user.id if update.effective_user else 0
     lang = _user_lang(update)
+    config_path = context.bot_data.get("openab_config_path")
+    if try_add_allowlist_by_api_token(config_path, "telegram", user_id, update.message.text):
+        await update.message.reply_text(t(lang, "allowlist_added_by_token"))
+        return
     if not _is_user_allowed(user_id, context):
         key = "auth_not_configured" if not _is_auth_enabled(context) else "unauthorized"
         msg = t(lang, key) + "\n\n" + t(lang, "your_user_id") + f"<code>{user_id}</code>"

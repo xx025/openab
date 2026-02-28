@@ -37,6 +37,15 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 | `agent.timeout` | 否 | 超时秒数（默认：300） |
 | `cursor.cmd`、`codex.cmd`、`gemini.cmd`、`claude.cmd`、`openclaw.cmd` | 否 | 各后端对应的 CLI 可执行文件名 |
 | 各后端专用选项 | 否 | 如 `openclaw.thinking`（off \| minimal \| low \| medium \| high \| xhigh）、`claude.model`、`codex.skip_git_check` 等，见 [config.example.yaml](../../config.example.yaml)。 |
+| `api.key` | 否 | 若设置，访问 `openab run serve` 的请求需携带 `Authorization: Bearer <api.key>`。不设则仅限本地/无鉴权使用。 |
+| `api.host` | 否 | `openab run serve` 监听地址（默认 `127.0.0.1`），可用 `--host` 覆盖。 |
+| `api.port` | 否 | `openab run serve` 监听端口（默认 `8000`），可用 `--port` 覆盖。 |
+
+---
+
+## OpenAI API 兼容服务
+
+运行 `openab run serve` 可启动与 OpenAI Chat Completions 格式兼容的 HTTP 接口。兼容客户端（Open WebUI、LiteLLM、OpenAI SDK 等）可将 `base_url=http://127.0.0.1:8000/v1`，若在配置中设置了 `api.key` 则需填写对应 API Key。请求中最后一条用户消息会发给当前配置的智能体（Cursor、OpenClaw 等），回复以 `choices[0].message.content` 返回。当前不支持流式输出。
 
 ---
 
@@ -56,14 +65,17 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 
 | 命令 | 说明 |
 |------|------|
-| `openab` / `openab run` | 运行 Telegram 机器人 |
-| `openab run-discord` | 运行 Discord 机器人 |
+| `openab` | 无子命令时：先检查配置；若配置为空则提示并默认启动 API 服务（run serve），否则显示帮助。 |
+| `openab run serve` | 启动 OpenAI API 兼容 HTTP 服务（`POST /v1/chat/completions`、`GET /v1/models`）。可选 `--host`、`--port` 或配置 `api.host` / `api.port`。 |
+| `openab run telegram` | 运行 Telegram 机器人 |
+| `openab run discord` | 运行 Discord 机器人 |
+| `openab run` | 未指定 run 目标时：同 `openab`（检查配置，空则 run serve，否则显示 run 帮助）。 |
 | `openab config path` | 打印配置文件路径 |
 | `openab config get [key]` | 显示配置或指定键的值 |
 | `openab config set <key> <value>` | 设置配置键并保存 |
-| `openab install-service` | 安装为 **Linux 用户级 systemd 服务**（可选 `--discord` 装 Discord、`--start` 立即启动）。**仅 Linux。** 在 macOS 上请在终端直接运行 `openab run` 或 `openab run-discord`（或自行配置 launchd）。 |
+| `openab install-service` | 安装为 **Linux 用户级 systemd 服务**（可选 `--discord` 装 Discord、`--start` 立即启动）。**仅 Linux。** 在 macOS 上请直接运行 `openab run telegram` 或 `openab run discord`（或自行配置 launchd）。 |
 
-选项：`--token`、`--workspace`、`--verbose`（如 `openab --token "..." --workspace /path/to/dir`）。
+选项：`--config` / `-c` 指定配置文件；`run telegram` / `run discord` 可用 `--token`、`--workspace`、`--verbose`；`run serve` 可用 `--host`、`--port`。
 
 ### Telegram 机器人
 

@@ -31,6 +31,7 @@ MESSAGES = {
             "发送 /whoami 可查看你的 User ID，提供给管理员。"
         ),
         "auth_allow_all_hint_discord": "管理员也可在配置中设置 discord.allow_all: true 开放给所有人使用。",
+        "allowlist_added_by_token": "已加入白名单，之后可直接发消息使用。",
     },
     "en": {
         "unauthorized": (
@@ -61,5 +62,6 @@ MESSAGES = {
             "Send /whoami to see your User ID and ask the admin."
         ),
         "auth_allow_all_hint_discord": "Admin can also set discord.allow_all: true in config to open to everyone.",
+        "allowlist_added_by_token": "Added to allowlist. You can send messages now.",
     },
 }

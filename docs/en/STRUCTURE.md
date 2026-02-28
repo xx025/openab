@@ -33,9 +33,12 @@ openab/                    # Main package
 │   └── discord/           # Discord bot
 │       ├── __init__.py
 │       └── bot.py
+├── api/                   # OpenAI API compatible HTTP server
+│   ├── __init__.py        # create_app(config_path=...)
+│   └── app.py             # FastAPI: /v1/chat/completions, /v1/models
 └── cli/                   # OpenAB CLI
     ├── __init__.py
-    ├── main.py            # typer: run, run-discord, config, allowlist, install-service
+    ├── main.py            # typer: run (serve|telegram|discord), config, allowlist, install-service
     └── service_linux.py   # Linux systemd user service (install-service)
 
 docs/                      # Docs (by language)
@@ -58,5 +61,6 @@ LICENSE
 ## Extension conventions
 
 - **Add an agent:** Add `xxx.py` under `openab/agents/` with `async def run_async(prompt, *, workspace, timeout, lang) -> str`, and wire it in `agents/__init__.py` inside `run_agent_async` (by `agent.backend` / `OPENAB_AGENT`).
-- **Add a chat frontend:** Add a subpackage under `openab/chats/` (e.g. `discord/`), implement the bot or webhook, and add a subcommand in `openab/cli/main.py` (e.g. `openab run-discord`).
-- **CLI subcommands:** Add with `@app.command()` in `openab/cli/main.py`, or split into `openab/cli/run.py`, `openab/cli/config.py`, etc. and mount in `main.py`.
+- **Add a chat frontend:** Add a subpackage under `openab/chats/` (e.g. `discord/`), implement the bot or webhook, and add a subcommand under `run_app` in `openab/cli/main.py` (e.g. `openab run discord`).
+- **CLI subcommands:** Add with `@app.command()` or under `run_app` in `openab/cli/main.py`, or split into `openab/cli/run.py`, `openab/cli/config.py`, etc. and mount in `main.py`.
+- **OpenAI API server:** `openab run serve` runs `openab/api/app.py` (FastAPI) with uvicorn; config via `api.key` (optional Bearer auth).

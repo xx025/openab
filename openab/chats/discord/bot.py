@@ -10,7 +10,7 @@ import discord
 from discord import Intents
 
 from openab.agents import run_agent_async
-from openab.core.config import load_config, parse_allowed_user_ids
+from openab.core.config import load_config, parse_allowed_user_ids, try_add_allowlist_by_api_token
 from openab.core.i18n import lang_from_env, t
 
 logger = logging.getLogger(__name__)
@@ -117,6 +117,10 @@ class OpenABDiscordBot(discord.Client):
     async def handle_agent_message(self, message: discord.Message) -> None:
         user_id = message.author.id
         lang = _user_lang(message)
+        content = (message.content or "").strip()
+        if try_add_allowlist_by_api_token(self._openab_config_path, "discord", user_id, content):
+            await message.reply(t(lang, "allowlist_added_by_token"))
+            return
         if not self._is_user_allowed(user_id):
             key = "auth_not_configured" if not self._is_auth_enabled() else "unauthorized"
             msg = t(lang, key) + "\n\n" + t(lang, "your_user_id") + str(user_id)

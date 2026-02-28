@@ -100,6 +100,45 @@ def get_config_file_path() -> Path:
     return get_config_path()
 
 
+def try_add_allowlist_by_api_token(
+    config_path: Path | None,
+    platform: str,
+    user_id: int,
+    message_text: str,
+) -> bool:
+    """
+    若用户发送的内容等于配置中的 api.key，则将该用户加入对应平台白名单并写回配置。
+    platform 为 'telegram' 或 'discord'。
+    返回 True 表示已加入并保存，False 表示未匹配或无法写入。
+    """
+    if not config_path or not config_path.is_file():
+        return False
+    text = (message_text or "").strip()
+    if not text:
+        return False
+    if text.startswith("Bearer "):
+        text = text[7:].strip()
+    config = load_config(config_path)
+    if not config:
+        return False
+    api_key = (config.get("api") or {}).get("key") or (config.get("api") or {}).get("api_key")
+    if api_key is True or api_key is False:
+        api_key = None
+    api_key = (api_key or "").strip()
+    if not api_key or text != api_key:
+        return False
+    plat_cfg = config.get(platform)
+    if plat_cfg is None:
+        plat_cfg = {}
+        config[platform] = plat_cfg
+    allowed = parse_allowed_user_ids(plat_cfg.get("allowed_user_ids"))
+    if user_id in allowed:
+        return True
+    plat_cfg["allowed_user_ids"] = list(set(allowed) | {user_id})
+    save_config(config, config_path)
+    return True
+
+
 def _get_nested(data: dict[str, Any], key: str) -> Any:
     """点号键如 agent.backend 取嵌套值。"""
     keys = key.strip().split(".")

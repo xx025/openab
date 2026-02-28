@@ -66,10 +66,11 @@ def install_user_service(
     exe, args = _find_openab_executable()
     exec_list = [exe] + args
     if discord:
-        exec_list = exec_list + ["run-discord"]
+        exec_list = exec_list + ["run", "discord"]
         name = SERVICE_DISCORD_NAME
         description = "OpenAB Discord bot"
     else:
+        exec_list = exec_list + ["run", "telegram"]
         name = SERVICE_NAME
         description = "OpenAB (Telegram bot)"
     unit_path = SYSTEMD_USER_DIR / name

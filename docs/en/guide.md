@@ -37,6 +37,15 @@ New keys are written to the existing config file (YAML or JSON by path); if no f
 | `agent.timeout` | No | Timeout in seconds (default: 300) |
 | `cursor.cmd`, `codex.cmd`, `gemini.cmd`, `claude.cmd`, `openclaw.cmd` | No | CLI binary name for each backend |
 | Backend-specific options | No | e.g. `openclaw.thinking` (off \| minimal \| low \| medium \| high \| xhigh), `claude.model`, `codex.skip_git_check`, etc. See [config.example.yaml](../../config.example.yaml). |
+| `api.key` | No | If set, requests to `openab run serve` must send `Authorization: Bearer <api.key>`. Omit for local/unprotected use. |
+| `api.host` | No | Bind host for `openab run serve` (default: `127.0.0.1`). Overridable with `--host`. |
+| `api.port` | No | Bind port for `openab run serve` (default: `8000`). Overridable with `--port`. |
+
+---
+
+## OpenAI API compatible server
+
+Run `openab run serve` to expose an HTTP API that matches the OpenAI Chat Completions format. Compatible clients (Open WebUI, LiteLLM, OpenAI SDK, etc.) can use `base_url=http://127.0.0.1:8000/v1` and any non-empty `api_key` if you set `api.key` in config. The last user message in the request is sent to your configured agent (Cursor, OpenClaw, etc.); the reply is returned as `choices[0].message.content`. Streaming is not supported yet.
 
 ---
 
@@ -56,14 +65,17 @@ New keys are written to the existing config file (YAML or JSON by path); if no f
 
 | Command | Description |
 |---------|-------------|
-| `openab` / `openab run` | Run Telegram bot |
-| `openab run-discord` | Run Discord bot |
+| `openab` | No subcommand: check config; if empty → prompt and start API server (run serve); else show help. |
+| `openab run serve` | Start OpenAI API compatible HTTP server (`POST /v1/chat/completions`, `GET /v1/models`). Optional: `--host`, `--port` or config `api.host` / `api.port`. |
+| `openab run telegram` | Run Telegram bot |
+| `openab run discord` | Run Discord bot |
+| `openab run` | No run target: same as `openab` (check config; if empty → run serve, else show run help). |
 | `openab config path` | Print config file path |
 | `openab config get [key]` | Show config or value at key |
 | `openab config set <key> <value>` | Set config key and save |
-| `openab install-service` | Install as a **Linux user-level systemd service** (optional: `--discord` for Discord, `--start` to start now). **Linux only.** On macOS run `openab run` or `openab run-discord` in the terminal (or configure launchd yourself). |
+| `openab install-service` | Install as a **Linux user-level systemd service** (optional: `--discord` for Discord, `--start` to start now). **Linux only.** On macOS run `openab run telegram` or `openab run discord` in the terminal (or configure launchd yourself). |
 
-Options: `--token`, `--workspace`, `--verbose` (e.g. `openab --token "..." --workspace /path/to/dir`).
+Options: `--config` / `-c` for config path; for `run telegram` / `run discord` use `--token`, `--workspace`, `--verbose`; for `run serve` use `--host`, `--port`.
 
 ### Telegram bot
 

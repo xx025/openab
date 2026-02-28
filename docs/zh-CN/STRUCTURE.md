@@ -33,9 +33,12 @@ openab/                    # 主包
 │   └── discord/           # Discord 机器人
 │       ├── __init__.py
 │       └── bot.py
+├── api/                   # OpenAI API 兼容 HTTP 服务
+│   ├── __init__.py        # create_app(config_path=...)
+│   └── app.py             # FastAPI: /v1/chat/completions, /v1/models
 └── cli/                   # OpenAB 命令行
     ├── __init__.py
-    ├── main.py            # typer: run, run-discord, config, allowlist, install-service
+    ├── main.py            # typer: run (serve|telegram|discord), config, allowlist, install-service
     └── service_linux.py   # Linux systemd 用户服务（install-service）
 
 docs/                      # 文档（按语言分目录）
@@ -58,5 +61,6 @@ LICENSE
 ## 扩展约定
 
 - **新增智能体**：在 `openab/agents/` 下新增 `xxx.py`，实现 `async def run_async(prompt, *, workspace, timeout, lang) -> str`，并在 `agents/__init__.py` 的 `run_agent_async` 中按 `agent.backend` / `OPENAB_AGENT` 分发。
-- **新增聊天前端**：在 `openab/chats/` 下新增子包（如 `discord/`），实现 bot 或 webhook，在 `openab/cli/main.py` 中增加子命令（如 `openab run-discord`）。
-- **CLI 子命令**：在 `openab/cli/main.py` 用 `@app.command()` 增加，或拆成 `openab/cli/run.py`、`openab/cli/config.py` 等再在 `main.py` 中挂载。
+- **新增聊天前端**：在 `openab/chats/` 下新增子包（如 `discord/`），实现 bot 或 webhook，在 `openab/cli/main.py` 的 `run_app` 下增加子命令（如 `openab run discord`）。
+- **CLI 子命令**：在 `openab/cli/main.py` 用 `@app.command()` 或在 `run_app` 下增加，或拆成 `openab/cli/run.py`、`openab/cli/config.py` 等再在 `main.py` 中挂载。
+- **OpenAI API 服务**：`openab run serve` 使用 `openab/api/app.py`（FastAPI）经 uvicorn 启动；可选配置 `api.key` 做 Bearer 鉴权。

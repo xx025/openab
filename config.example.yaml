@@ -16,6 +16,12 @@ discord:
   bot_token: ""     # 从 Discord 开发者门户获取
   allowed_user_ids: []
 
+# OpenAI API 兼容服务（openab serve）
+# api:
+#   host: "127.0.0.1"   # 监听地址，默认 127.0.0.1
+#   port: 8000          # 监听端口，默认 8000
+#   key: ""             # 可选：设置后请求需带 Authorization: Bearer <key>
+
 # 以下为各后端可选，多数情况可不写
 # cursor:
 #   cmd: agent
