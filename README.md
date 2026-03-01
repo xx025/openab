@@ -1,3 +1,5 @@
+[**中文**](docs/zh-CN/README.md) · [**English**](README.md)
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/xx025/openab/main/assets/icon.png" width="256" alt="OpenAB" />
 </p>
@@ -6,7 +8,7 @@
 
 **Open Agent Bridge** — Connect AI agents to chat platforms. One config, one bridge. **Currently implemented:** Cursor, Codex. _Gemini, Claude, OpenClaw not yet implemented._
 
-[中文](docs/zh-CN/README.md) · [Configuration & usage](docs/en/guide.md)
+[Configuration & usage](docs/en/guide.md)
 
 ---
 

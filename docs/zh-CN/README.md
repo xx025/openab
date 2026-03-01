@@ -1,3 +1,5 @@
+[**中文**](README.md) · [**English**](../../README.md)
+
 <p align="center">
   <img src="../../assets/icon.png" width="256" alt="OpenAB" />
 </p>
@@ -6,7 +8,7 @@
 
 **Open Agent Bridge（开放智能体桥接）** — 将智能体与聊天平台连接。一份配置、一座桥。**当前已实现：** Cursor、Codex。_Gemini、Claude、OpenClaw 尚未实现。_
 
-[English](../../README.md) · [配置与使用说明](guide.md)
+[配置与使用说明](guide.md)
 
 ---
 
