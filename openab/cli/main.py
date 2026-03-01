@@ -33,7 +33,7 @@ load_dotenv()
 app = typer.Typer(
     name="openab",
     help=cli_t("cli_help"),
-    no_args_is_help=False,
+    no_args_is_help=True,
 )
 
 
@@ -48,6 +48,11 @@ def _echo_severe_warning(msg: str) -> None:
         typer.echo(_CLI_RED + msg + _CLI_RESET, err=True)
     else:
         typer.echo(msg, err=True)
+
+
+def _echo_config_file_path() -> None:
+    """启动时打印当前使用的配置文件路径。"""
+    typer.echo(cli_t("config_file_used", path=str(get_config_file_path())))
 
 
 def _get_workspace(config: dict, workspace: Optional[Path]) -> Path:
@@ -65,24 +70,16 @@ def _is_interactive() -> bool:
     return sys.stdin.isatty()
 
 
-def _ask_save_config() -> bool:
-    try:
-        ans = input(cli_t("run_prompt_save_config")).strip().lower()
-        return ans not in ("n", "no")
-    except (EOFError, KeyboardInterrupt):
-        return False
-
-
 def _ensure_agent_backend(config: dict) -> dict:
-    """若未配置 agent.backend 且当前在交互环境，检测可用后端并引导选择，可选保存。返回可能已修改的 config。"""
+    """若未配置 agent.backend 且当前在交互环境，检测可用后端并引导选择，可选保存。配置里已指定 backend 则直接使用、不引导。"""
     if not _is_interactive():
+        return config
+    # 配置中已指定 agent.backend 时直接启动，不检测、不提示
+    current = (config.get("agent") or {}).get("backend")
+    if current is not None and str(current).strip():
         return config
     available = detect_available_backends()
     if not available:
-        return config
-    current = str((config.get("agent") or {}).get("backend") or "cursor").strip().lower()
-    backend_ids = [b[0] for b in available]
-    if current in backend_ids:
         return config
     cmd_by_backend = dict(BACKEND_CLI_NAMES)
     typer.echo("")
@@ -94,9 +91,8 @@ def _ensure_agent_backend(config: dict) -> dict:
         idx = int(raw)
         if 1 <= idx <= len(available):
             _set_nested(config, "agent.backend", available[idx - 1][0])
-            if _ask_save_config():
-                get_config_path().parent.mkdir(parents=True, exist_ok=True)
-                save_config(config)
+            get_config_path().parent.mkdir(parents=True, exist_ok=True)
+            save_config(config)
     except (ValueError, EOFError, KeyboardInterrupt):
         pass
     return config
@@ -113,9 +109,8 @@ def _ensure_telegram_run_config(
             t = input(cli_t("run_prompt_telegram_token")).strip()
             if t:
                 config.setdefault("telegram", {})["bot_token"] = t
-                if _ask_save_config():
-                    get_config_path().parent.mkdir(parents=True, exist_ok=True)
-                    save_config(config)
+                get_config_path().parent.mkdir(parents=True, exist_ok=True)
+                save_config(config)
         except (EOFError, KeyboardInterrupt):
             pass
     if not t:
@@ -128,8 +123,7 @@ def _ensure_telegram_run_config(
             if val:
                 ids = coerce_config_value("telegram.allowed_user_ids", val)
                 _set_nested(config, "telegram.allowed_user_ids", ids)
-                if _ask_save_config():
-                    save_config(config)
+                save_config(config)
                 allowed = parse_allowed_user_ids(ids)
         except (EOFError, KeyboardInterrupt):
             pass
@@ -147,9 +141,8 @@ def _ensure_discord_run_config(
             t = input(cli_t("run_prompt_discord_token")).strip()
             if t:
                 config.setdefault("discord", {})["bot_token"] = t
-                if _ask_save_config():
-                    get_config_path().parent.mkdir(parents=True, exist_ok=True)
-                    save_config(config)
+                get_config_path().parent.mkdir(parents=True, exist_ok=True)
+                save_config(config)
         except (EOFError, KeyboardInterrupt):
             pass
     if not t:
@@ -162,8 +155,7 @@ def _ensure_discord_run_config(
             if val:
                 ids = coerce_config_value("discord.allowed_user_ids", val)
                 _set_nested(config, "discord.allowed_user_ids", ids)
-                if _ask_save_config():
-                    save_config(config)
+                save_config(config)
                 allowed = parse_allowed_user_ids(ids)
         except (EOFError, KeyboardInterrupt):
             pass
@@ -200,6 +192,7 @@ def _do_serve(
     import uvicorn
 
     config_path = get_config_file_path()
+    _echo_config_file_path()
     config = load_config()
     if not (token or "").strip():
         config = _ensure_api_key(config)
@@ -229,30 +222,171 @@ def _default(
         os.environ["OPENAB_CONFIG"] = str(config.expanduser().resolve())
     if ctx.invoked_subcommand is not None:
         return
-    # 无子命令：先检查配置，若什么都没有则提示并默认 run serve
+    # 无子命令：根据配置选择 serve / telegram / discord，未配置且交互时引导用户选择
     cfg = load_config()
-    if _config_empty(cfg):
-        typer.echo(cli_t("default_no_config_run_serve"))
+    target = _resolve_run_target_from_config(cfg)
+    if not target and _is_interactive():
+        target = _prompt_run_target(cfg)
+    if not target:
+        target = "serve"
+    if target == "serve":
+        if _config_empty(cfg):
+            typer.echo(cli_t("default_no_config_run_serve"))
         _do_serve()
-    else:
-        typer.echo(cli_t("default_show_help"))
-        raise typer.Exit(0)
+        return
+    if target == "telegram":
+        _echo_config_file_path()
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+        cfg = _ensure_agent_backend(cfg)
+        t, allowed, cfg = _ensure_telegram_run_config(cfg, None)
+        ws = _get_workspace(cfg, None)
+        timeout = int((cfg.get("agent") or {}).get("timeout") or 300)
+        allow_all = (cfg.get("telegram") or {}).get("allow_all") is True
+        if not allowed and not allow_all:
+            typer.echo(cli_t("allowlist_empty_warning"), err=True)
+        if allow_all:
+            _echo_severe_warning(cli_t("allow_all_severe_warning"))
+        typer.echo(cli_t("starting"))
+        run_telegram_bot(t, workspace=ws, timeout=timeout, allowed_user_ids=allowed, allow_all=allow_all, config_path=get_config_file_path(), agent_config=cfg)
+        return
+    if target == "discord":
+        _echo_config_file_path()
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+        cfg = _ensure_agent_backend(cfg)
+        t, allowed, cfg = _ensure_discord_run_config(cfg, None)
+        ws = _get_workspace(cfg, None)
+        timeout = int((cfg.get("agent") or {}).get("timeout") or 300)
+        allow_all = (cfg.get("discord") or {}).get("allow_all") is True
+        if not allowed and not allow_all:
+            typer.echo(cli_t("allowlist_empty_warning"), err=True)
+        if allow_all:
+            _echo_severe_warning(cli_t("allow_all_severe_warning"))
+        typer.echo(cli_t("starting_discord"))
+        run_discord_bot(t, workspace=ws, timeout=timeout, allowed_user_ids=allowed, allow_all=allow_all, config_path=get_config_file_path(), agent_config=cfg)
+        return
+    typer.echo(cli_t("default_show_help"))
+    raise typer.Exit(0)
 
 
 run_app = typer.Typer(help=cli_t("run_help"), no_args_is_help=False, invoke_without_command=True)
 
 
+def _resolve_run_target_from_config(config: dict) -> str:
+    """
+    从配置文件中解析 run 目标：仅读取 service.run（serve | telegram | discord），
+    未配置或无效时返回空字符串（表示需引导或默认 serve）。
+    """
+    svc = (config.get("service") or {})
+    run = (svc.get("run") or "").strip().lower()
+    if run in ("serve", "telegram", "discord"):
+        return run
+    return ""
+
+
+def _prompt_run_target(config: dict) -> str:
+    """
+    交互式引导用户选择启动目标（serve / telegram / discord），可选写入 service.run。
+    非交互环境直接返回 serve。
+    """
+    if not _is_interactive():
+        return "serve"
+    typer.echo("")
+    typer.echo(cli_t("run_prompt_target"))
+    try:
+        raw = input(cli_t("run_prompt_target_prompt")).strip()
+        if raw == "1":
+            choice = "serve"
+        elif raw == "2":
+            choice = "telegram"
+        elif raw == "3":
+            choice = "discord"
+        else:
+            choice = "serve"
+        config.setdefault("service", {})["run"] = choice
+        get_config_path().parent.mkdir(parents=True, exist_ok=True)
+        save_config(config)
+        return choice
+    except (EOFError, KeyboardInterrupt):
+        return "serve"
+
+
 @run_app.callback()
-def _run_default(ctx: typer.Context) -> None:
+def _run_default(
+    ctx: typer.Context,
+    config_path: Optional[Path] = typer.Option(None, "--config", "-c", path_type=Path, help=cli_t("opt_config")),
+) -> None:
+    if config_path is not None:
+        os.environ["OPENAB_CONFIG"] = str(config_path.expanduser().resolve())
     if ctx.invoked_subcommand is not None:
         return
     cfg = load_config()
-    if _config_empty(cfg):
-        typer.echo(cli_t("default_no_config_run_serve"))
+    target = _resolve_run_target_from_config(cfg)
+    if not target and _is_interactive():
+        target = _prompt_run_target(cfg)
+    if not target:
+        target = "serve"
+    if target == "serve":
+        if _config_empty(cfg):
+            typer.echo(cli_t("default_no_config_run_serve"))
         _do_serve()
-    else:
-        typer.echo(cli_t("default_show_help_run"))
-        raise typer.Exit(0)
+        return
+    if target == "telegram":
+        _echo_config_file_path()
+        # 复用 run_telegram 逻辑，但不通过 typer 传参
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        )
+        cfg = _ensure_agent_backend(cfg)
+        t, allowed, cfg = _ensure_telegram_run_config(cfg, None)
+        ws = _get_workspace(cfg, None)
+        timeout = (cfg.get("agent") or {}).get("timeout")
+        timeout = int(timeout) if timeout is not None else 300
+        allow_all = (cfg.get("telegram") or {}).get("allow_all") is True
+        if not allowed and not allow_all:
+            typer.echo(cli_t("allowlist_empty_warning"), err=True)
+        if allow_all:
+            _echo_severe_warning(cli_t("allow_all_severe_warning"))
+        typer.echo(cli_t("starting"))
+        run_telegram_bot(
+            t,
+            workspace=ws,
+            timeout=timeout,
+            allowed_user_ids=allowed,
+            allow_all=allow_all,
+            config_path=get_config_file_path(),
+            agent_config=cfg,
+        )
+        return
+    if target == "discord":
+        _echo_config_file_path()
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        )
+        cfg = _ensure_agent_backend(cfg)
+        t, allowed, cfg = _ensure_discord_run_config(cfg, None)
+        ws = _get_workspace(cfg, None)
+        timeout = (cfg.get("agent") or {}).get("timeout")
+        timeout = int(timeout) if timeout is not None else 300
+        allow_all = (cfg.get("discord") or {}).get("allow_all") is True
+        if not allowed and not allow_all:
+            typer.echo(cli_t("allowlist_empty_warning"), err=True)
+        if allow_all:
+            _echo_severe_warning(cli_t("allow_all_severe_warning"))
+        typer.echo(cli_t("starting_discord"))
+        run_discord_bot(
+            t,
+            workspace=ws,
+            timeout=timeout,
+            allowed_user_ids=allowed,
+            allow_all=allow_all,
+            config_path=get_config_file_path(),
+            agent_config=cfg,
+        )
+        return
+    typer.echo(cli_t("default_show_help_run"))
+    raise typer.Exit(0)
 
 
 @run_app.command("serve", help=cli_t("run_serve_help"))
@@ -260,8 +394,11 @@ def run_serve(
     host: Optional[str] = typer.Option(None, "--host", "-H", help=cli_t("serve_opt_host")),
     port: Optional[int] = typer.Option(None, "--port", "-p", help=cli_t("serve_opt_port")),
     token: Optional[str] = typer.Option(None, "--token", "-t", help=cli_t("serve_opt_token")),
+    config_path: Optional[Path] = typer.Option(None, "--config", "-c", path_type=Path, help=cli_t("opt_config")),
 ) -> None:
     """Start OpenAI API compatible HTTP server (POST /v1/chat/completions, GET /v1/models)."""
+    if config_path is not None:
+        os.environ["OPENAB_CONFIG"] = str(config_path.expanduser().resolve())
     _do_serve(host=host, port=port, token=token)
 
 
@@ -270,13 +407,17 @@ def run_telegram(
     token: Optional[str] = typer.Option(None, "--token", "-t", help=cli_t("opt_token")),
     workspace: Optional[Path] = typer.Option(None, "--workspace", "-w", path_type=Path, help=cli_t("opt_workspace")),
     verbose: bool = typer.Option(False, "--verbose", "-v", help=cli_t("opt_verbose")),
+    config_path: Optional[Path] = typer.Option(None, "--config", "-c", path_type=Path, help=cli_t("opt_config")),
 ) -> None:
     """Run Telegram bot (long polling)."""
+    if config_path is not None:
+        os.environ["OPENAB_CONFIG"] = str(config_path.expanduser().resolve())
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
     config = load_config()
+    _echo_config_file_path()
     config = _ensure_agent_backend(config)
     t, allowed, config = _ensure_telegram_run_config(config, token)
     ws = _get_workspace(config, workspace)
@@ -304,13 +445,17 @@ def run_discord(
     token: Optional[str] = typer.Option(None, "--token", "-t", help=cli_t("opt_token_discord")),
     workspace: Optional[Path] = typer.Option(None, "--workspace", "-w", path_type=Path, help=cli_t("opt_workspace")),
     verbose: bool = typer.Option(False, "--verbose", "-v", help=cli_t("opt_verbose")),
+    config_path: Optional[Path] = typer.Option(None, "--config", "-c", path_type=Path, help=cli_t("opt_config")),
 ) -> None:
     """Run Discord bot."""
+    if config_path is not None:
+        os.environ["OPENAB_CONFIG"] = str(config_path.expanduser().resolve())
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
     config = load_config()
+    _echo_config_file_path()
     config = _ensure_agent_backend(config)
     t, allowed, config = _ensure_discord_run_config(config, token)
     ws = _get_workspace(config, workspace)
@@ -464,6 +609,8 @@ def _install_wizard() -> tuple[bool, bool, bool]:
             cmd = cmd_by_backend.get(bid, bid)
             typer.echo(f"  {i}) {bid} ({cmd})")
         backend_ids = [b[0] for b in available]
+        if current_backend == "agent":
+            current_backend = "cursor"
         if current_backend not in backend_ids:
             try:
                 raw = input(cli_t("install_wizard_backend_prompt", n=len(available))).strip() or "1"
@@ -556,3 +703,46 @@ def install_service(
     except subprocess.CalledProcessError as e:
         typer.echo(f"systemctl failed: {e}", err=True)
         raise typer.Exit(1)
+
+
+@app.command("uninstall-service", help=cli_t("uninstall_service_help"))
+def uninstall_service(
+    discord: bool = typer.Option(False, "--discord", help="Only remove openab-discord.service."),
+    main_only: bool = typer.Option(False, "--main", help="Only remove openab.service (main service)."),
+    remove_config: bool = typer.Option(False, "--config", "-c", help="Also delete the config file (e.g. ~/.config/openab/config.yaml)."),
+) -> None:
+    """Uninstall user-level systemd service(s) and optionally remove config file (Linux only)."""
+    try:
+        from openab.cli.service_linux import uninstall_user_services
+    except ImportError:
+        typer.echo(cli_t("install_service_linux_only"), err=True)
+        raise typer.Exit(1)
+    try:
+        if discord:
+            removed = uninstall_user_services(discord=True)
+        elif main_only:
+            removed = uninstall_user_services(discord=False)
+        else:
+            removed = uninstall_user_services(all_services=True)
+    except RuntimeError as e:
+        if "only supported on Linux" in str(e):
+            typer.echo(cli_t("install_service_linux_only"), err=True)
+        else:
+            typer.echo(str(e), err=True)
+        raise typer.Exit(1)
+    except subprocess.CalledProcessError as e:
+        typer.echo(f"systemctl failed: {e}", err=True)
+        raise typer.Exit(1)
+
+    if removed:
+        typer.echo(cli_t("uninstall_service_done", paths=", ".join(removed)))
+    else:
+        typer.echo(cli_t("uninstall_service_none"))
+
+    if remove_config:
+        config_path = get_config_file_path()
+        if config_path.is_file():
+            config_path.unlink()
+            typer.echo(cli_t("uninstall_config_done", path=str(config_path)))
+        else:
+            typer.echo(cli_t("uninstall_config_none"))

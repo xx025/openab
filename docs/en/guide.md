@@ -50,7 +50,7 @@ New keys are written to the existing config file (YAML or JSON by path); if no f
 | `telegram.allowed_user_ids` | For `run` | List of Telegram user IDs. Empty = nobody can use. Users get ID with `/whoami`. |
 | `discord.bot_token` | For `run discord` | Bot token from [Discord Developer Portal](https://discord.com/developers/applications); or pass with `openab run discord --token <token>`. |
 | `discord.allowed_user_ids` | For `run discord` | List of Discord user IDs. Empty = nobody. Users get ID with `!whoami` in DM. |
-| `agent.backend` | No | `cursor`, `codex` (implemented); `gemini`, `claude`, `openclaw` _not yet implemented_ (default: `cursor`) |
+| `agent.backend` | No | `cursor`, `agent` (alias for cursor, Cursor CLI is `agent`), `codex` (implemented); `gemini`, `claude`, `openclaw` _not yet implemented_ (default: `cursor`) |
 | `agent.workspace` | No | Agent working directory (default: **user home** `~`) |
 | `agent.timeout` | No | Timeout in seconds (default: 300) |
 | `cursor.cmd`, `codex.cmd`, `gemini.cmd`, `claude.cmd`, `openclaw.cmd` | No | CLI binary name for each backend |
@@ -58,6 +58,7 @@ New keys are written to the existing config file (YAML or JSON by path); if no f
 | `api.key` | No | If set, requests to `openab run serve` must send `Authorization: Bearer <api.key>`. Omit for local/unprotected use. You can override with `openab run serve --token <key>` for a single run. |
 | `api.host` | No | Bind host for `openab run serve` (default: `127.0.0.1`). Overridable with `--host`. |
 | `api.port` | No | Bind port for `openab run serve` (default: `8000`). Overridable with `--port`. |
+| `service.run` | No | Run target for `openab run` (no subcommand) and **install-service** systemd unit, **parsed only from this key**: `serve` \| `telegram` \| `discord`. Defaults to `serve` if unset or invalid. |
 
 ---
 
@@ -90,15 +91,15 @@ Run `openab run serve` to expose an HTTP API compatible with OpenAI:
 
 | Command | Description |
 |---------|-------------|
-| `openab` | No subcommand: check config; if empty → prompt and start API server (run serve); else show help. |
+| `openab` | No subcommand: same as `openab run` (target parsed from config `service.run`, default `serve`). |
 | `openab run serve` | Start OpenAI API compatible HTTP server (`POST /v1/chat/completions`, `GET /v1/models`). Optional: `--token` (API key), `--host`, `--port` or config `api.key` / `api.host` / `api.port`. |
 | `openab run telegram` | Run Telegram bot. Optional: `--token`, `--workspace`, `--verbose`. |
 | `openab run discord` | Run Discord bot. Optional: `--token`, `--workspace`, `--verbose`. |
-| `openab run` | No run target: same as `openab` (check config; if empty → run serve, else show run help). |
+| `openab run` | No run target: run target is **parsed from config** `service.run` (`serve` \| `telegram` \| `discord`); defaults to `serve` if not set. |
 | `openab config path` | Print config file path |
 | `openab config get [key]` | Show config or value at key |
 | `openab config set <key> <value>` | Set config key and save |
-| `openab install-service` | Install as a **Linux user-level systemd service** (optional: `--discord` for Discord, `--start` to start now). **Linux only.** On macOS run `openab run telegram` or `openab run discord` in the terminal (or configure launchd yourself). |
+| `openab install-service` | Install as a **Linux user-level systemd service**; the service runs `openab run`, with target **parsed only from config** `service.run`. Optional: `--discord` to add a Discord-only unit, `--start` to start now. **Linux only.** |
 
 **Global options** (e.g. `openab -c /path/config.yaml run telegram`): `--config` / `-c` config path; `--workspace` / `-w` workspace; `--verbose` / `-v` verbose logging. **Per-command options:** `run telegram` / `run discord` support `--token` / `-t` (bot token), `--workspace`, `--verbose`; `run serve` supports `--token` / `-t` (API key, overrides config), `--host`, `--port`.
 

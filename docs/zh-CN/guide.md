@@ -50,7 +50,7 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 | `telegram.allowed_user_ids` | 运行 `run` 时 | Telegram 用户 ID 列表。空则无人可用。用户可用 `/whoami` 查看自己的 ID。 |
 | `discord.bot_token` | 运行 `run discord` 时 | 来自 [Discord 开发者门户](https://discord.com/developers/applications) 的 Bot Token；也可用 `openab run discord --token <token>` 传入。 |
 | `discord.allowed_user_ids` | 运行 `run discord` 时 | Discord 用户 ID 列表。空则无人可用。用户可在私信中用 `!whoami` 查看 ID。 |
-| `agent.backend` | 否 | `cursor`、`codex`（已实现）；`gemini`、`claude`、`openclaw` _尚未实现_（默认：`cursor`） |
+| `agent.backend` | 否 | `cursor`、`agent`（与 cursor 等价，Cursor CLI 名为 agent）、`codex`（已实现）；`gemini`、`claude`、`openclaw` _尚未实现_（默认：`cursor`） |
 | `agent.workspace` | 否 | 智能体工作目录（默认：**用户家目录** `~`） |
 | `agent.timeout` | 否 | 超时秒数（默认：300） |
 | `cursor.cmd`、`codex.cmd`、`gemini.cmd`、`claude.cmd`、`openclaw.cmd` | 否 | 各后端对应的 CLI 可执行文件名 |
@@ -58,6 +58,7 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 | `api.key` | 否 | 若设置，访问 `openab run serve` 的请求需携带 `Authorization: Bearer <api.key>`。不设则仅限本地/无鉴权使用。也可用 `openab run serve --token <key>` 覆盖本次启动的 API key。 |
 | `api.host` | 否 | `openab run serve` 监听地址（默认 `127.0.0.1`），可用 `--host` 覆盖。 |
 | `api.port` | 否 | `openab run serve` 监听端口（默认 `8000`），可用 `--port` 覆盖。 |
+| `service.run` | 否 | `openab run`（无子命令）及 **install-service** 安装的 systemd 服务启动目标，**仅从本项解析**：`serve` \| `telegram` \| `discord`。不设或无效时默认为 `serve`。 |
 
 ---
 
@@ -90,15 +91,15 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 
 | 命令 | 说明 |
 |------|------|
-| `openab` | 无子命令时：先检查配置；若配置为空则提示并默认启动 API 服务（run serve），否则显示帮助。 |
+| `openab` | 无子命令时：根据配置自动选择 **serve** / **telegram** / **discord**（同 `openab run`）。 |
 | `openab run serve` | 启动 OpenAI API 兼容 HTTP 服务（`POST /v1/chat/completions`、`GET /v1/models`）。可选 `--token`（API key）、`--host`、`--port` 或配置 `api.key` / `api.host` / `api.port`。 |
 | `openab run telegram` | 运行 Telegram 机器人。可选 `--token`、`--workspace`、`--verbose`。 |
 | `openab run discord` | 运行 Discord 机器人。可选 `--token`、`--workspace`、`--verbose`。 |
-| `openab run` | 未指定 run 目标时：同 `openab`（检查配置，空则 run serve，否则显示 run 帮助）。 |
+| `openab run` | 未指定 run 目标时：从配置文件解析 **service.run**（`serve` \| `telegram` \| `discord`），未配置时默认 `serve`。 |
 | `openab config path` | 打印配置文件路径 |
 | `openab config get [key]` | 显示配置或指定键的值 |
 | `openab config set <key> <value>` | 设置配置键并保存 |
-| `openab install-service` | 安装为 **Linux 用户级 systemd 服务**（可选 `--discord` 装 Discord、`--start` 立即启动）。**仅 Linux。** 在 macOS 上请直接运行 `openab run telegram` 或 `openab run discord`（或自行配置 launchd）。 |
+| `openab install-service` | 安装为 **Linux 用户级 systemd 服务**，服务通过**配置文件**启动（执行 `openab run`，目标**仅从配置中的 service.run 解析**）。可选 `--discord` 额外安装 Discord 专用服务、`--start` 立即启动。**仅 Linux。** |
 
 **全局选项**（如 `openab -c /path/config.yaml run telegram`）：`--config` / `-c` 配置文件路径；`--workspace` / `-w` 工作目录；`--verbose` / `-v` 调试日志。**子命令选项**：`run telegram` / `run discord` 支持 `--token` / `-t`（Bot Token）、`--workspace`、`--verbose`；`run serve` 支持 `--token` / `-t`（API key，覆盖配置）、`--host`、`--port`。
 

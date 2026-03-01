@@ -3,8 +3,13 @@
 # 或设置环境变量 OPENAB_CONFIG 指向本文件。
 # 不设置 workspace 时默认使用用户家目录（~）。
 
+# 用户级 systemd 服务（openab install-service）及「openab run」无子命令时，仅从此项解析运行目标：
+# 不设置或无效时默认为 serve
+# service:
+#   run: telegram   # serve | telegram | discord
+
 agent:
-  backend: cursor   # cursor | codex（已实现）；gemini | claude | openclaw 尚未实现
+  backend: cursor   # cursor | agent（与 cursor 等价，Cursor CLI 名为 agent）| codex（已实现）；gemini | claude | openclaw 尚未实现
   # workspace: ~   # 不填或 ~ 表示家目录
   timeout: 300
 

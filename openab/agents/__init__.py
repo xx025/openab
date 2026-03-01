@@ -15,7 +15,11 @@ def get_backend(agent_config: dict[str, Any] | None = None) -> str:
     if agent_config:
         agent = agent_config.get("agent") or {}
         b = agent.get("backend") or "cursor"
-        return str(b).strip().lower()
+        out = str(b).strip().lower()
+        # Cursor CLI 可执行文件名为 agent，配置中写 backend: agent 与 cursor 等价
+        if out == "agent":
+            return "cursor"
+        return out
     return (os.environ.get("OPENAB_AGENT") or "cursor").strip().lower()
 
 
