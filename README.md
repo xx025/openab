@@ -30,33 +30,16 @@ pip install openab
 # or from repo: uv pip install -e .
 ```
 
-**2. Create config** — Copy the example and edit:
+**2. Run and follow the prompts**
 
 ```bash
-mkdir -p ~/.config/openab
-cp config.example.yaml ~/.config/openab/config.yaml
-# then edit: set telegram.bot_token and/or discord.bot_token
+openab run
 ```
 
-**3. Get a bot token** (for Telegram or Discord)
+You’ll choose **serve** (API), **telegram**, or **discord**, enter bot token and allowlist when asked; choices are saved to `~/.config/openab/config.yaml`. Then open your bot in the app and chat, or use the API at `http://127.0.0.1:8000/v1` with the printed key. Use `/resume` or `!resume` in chat to switch sessions.
 
-- **Telegram:** Open [@BotFather](https://t.me/BotFather) → send `/newbot` → follow prompts → copy the token into `telegram.bot_token` in config (or pass with `openab run telegram --token <token>`).
-- **Discord:** [Discord Developer Portal](https://discord.com/developers/applications) → New Application → Bot → Reset Token → copy into `discord.bot_token` (or use `--token` when running).
-
-**4. Allow yourself** — After the bot is running, send `/whoami` (Telegram) or `!whoami` (Discord) to get your user ID. Then either:
-
-- Add your ID to config: `openab config set telegram.allowed_user_ids "YOUR_ID"` (or `discord.allowed_user_ids`), **or**
-- Send the API key (printed when you run `openab run serve` once) as a message to the bot; it will add you to the allowlist automatically.
-
-**5. Run and chat**
-
-```bash
-openab run telegram   # or: openab run discord
-# In Telegram/Discord: open your bot, send any message. Use /resume to see session buttons (resume latest, new session, or pick a history session).
-```
-
-- **API only:** Run `openab run serve` — no bot token needed. Point clients at `http://127.0.0.1:8000/v1` with the printed API key.
-- No config? Running `openab` or `openab run` will start the API server by default and show a hint.
+- **Tokens:** Telegram → [@BotFather](https://t.me/BotFather) `/newbot`; Discord → [Developer Portal](https://discord.com/developers/applications) → Bot → Reset Token.
+- **Unauthorized?** Send `/whoami` or `!whoami` to get your ID, then `openab config set telegram.allowed_user_ids "ID"` (or send the API key to the bot to self-add).
 
 Full options: [Configuration & usage](docs/en/guide.md).
 

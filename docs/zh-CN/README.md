@@ -30,33 +30,16 @@ pip install openab
 # 或从仓库：uv pip install -e .
 ```
 
-**2. 创建配置**
+**2. 运行并按提示操作**
 
 ```bash
-mkdir -p ~/.config/openab
-cp config.example.yaml ~/.config/openab/config.yaml
-# 编辑 config.yaml：填写 telegram.bot_token 和/或 discord.bot_token
+openab run
 ```
 
-**3. 获取机器人 Token**
+按提示选择 **serve**（API）、**telegram** 或 **discord**，需要时输入 Bot Token 和白名单；选择会自动写入 `~/.config/openab/config.yaml`。然后在应用里打开机器人即可聊天，或使用 API：`http://127.0.0.1:8000/v1` 配合打印的 key。聊天里输入 `/resume` 或 `!resume` 可切换会话。
 
-- **Telegram：** 打开 [@BotFather](https://t.me/BotFather) → 发送 `/newbot` → 按提示操作 → 把得到的 token 填进配置的 `telegram.bot_token`（或用 `openab run telegram --token <token>` 传入）。
-- **Discord：** 打开 [Discord 开发者门户](https://discord.com/developers/applications) → 新建应用 → Bot → 重置 Token → 复制到配置的 `discord.bot_token`（或运行时加 `--token`）。
-
-**4. 把自己加入白名单** — 启动机器人后，在聊天里发送 `/whoami`（Telegram）或 `!whoami`（Discord）得到你的用户 ID。然后任选其一：
-
-- 写入配置：`openab config set telegram.allowed_user_ids "你的ID"`（或 `discord.allowed_user_ids`），**或**
-- 把 API key（先运行一次 `openab run serve` 会打印）作为一条消息发给机器人，会自动把你加入白名单。
-
-**5. 运行并开始聊天**
-
-```bash
-openab run telegram   # 或：openab run discord
-# 在 Telegram/Discord 里打开你的机器人，发任意消息即可。输入 /resume 可看到会话按钮（延续上一会话、创建新会话、或选择历史会话）。
-```
-
-- **仅用 API：** 运行 `openab run serve`，无需机器人 token。将客户端指向 `http://127.0.0.1:8000/v1`，鉴权用启动时打印的 API key。
-- 没有配置时，直接运行 `openab` 或 `openab run` 会默认启动 API 服务并给出提示。
+- **Token 获取：** Telegram 找 [@BotFather](https://t.me/BotFather) 发 `/newbot`；Discord 到 [开发者门户](https://discord.com/developers/applications) → Bot → 重置 Token。
+- **未授权？** 在聊天里发 `/whoami` 或 `!whoami` 得到 ID，再执行 `openab config set telegram.allowed_user_ids "ID"`，或把 API key 发给机器人自助加白。
 
 完整选项见 [配置与使用说明](guide.md)。
 

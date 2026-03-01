@@ -8,19 +8,15 @@ Technical reference for configuration, agent backends, commands, and security. C
 
 ## Quick start (first-time)
 
-Follow these steps to get the bot or API running in a few minutes:
-
 1. **Install** — `pip install openab` (Python 3.10+).
-2. **Choose platform** — Use **Telegram** or **Discord** for chat, or **HTTP API** only (`openab run serve`, no bot token needed).
-3. **Get token**  
-   - Telegram: [@BotFather](https://t.me/BotFather) → `/newbot` → copy the Bot Token.  
-   - Discord: [Developer Portal](https://discord.com/developers/applications) → New Application → Bot → Reset Token.
-4. **Create config** — `mkdir -p ~/.config/openab`, copy the repo’s [config.example.yaml](../../config.example.yaml) as `config.yaml`, and set `telegram.bot_token` or `discord.bot_token` (or pass with `openab run telegram --token <token>` and skip writing to file).
-5. **Allow yourself** — After starting the bot, send `/whoami` (Telegram) or `!whoami` (Discord) to get your user ID, then run `openab config set telegram.allowed_user_ids "YOUR_ID"` (or `discord.allowed_user_ids`); **or** run `openab run serve` once, copy the printed API key, and send that exact string as a message to the bot — it will add you to the allowlist and save the config.
-6. **Run** — `openab run telegram` or `openab run discord`. Open your bot in the app and send any message to talk to the agent.
-7. **Session switching** — Send `/resume` (Telegram) or `!resume` (Discord) to get buttons: **Resume latest**, **New session**, or pick a **history session** from your local Cursor chats (click to switch).
+2. **Run** — Run `openab run` and follow the prompts:
+   - Choose run target: **1) serve (API)**, **2) telegram**, **3) discord**
+   - If you pick telegram/discord, enter Bot Token and allowed user IDs when asked (or self-add later by sending the API key in chat)
+   - If `agent.backend` is not set, the CLI will detect backends and let you choose (e.g. Cursor/Codex)
+   - All choices are **saved automatically** to `~/.config/openab/config.yaml`
+3. **Use it** — With serve, the API is up; with telegram/discord, open your bot in the app and send a message. Use `/resume` (Telegram) or `!resume` (Discord) to resume or switch sessions.
 
-If you see “unauthorized”, ensure your user ID is in the platform’s `allowed_user_ids` or you’ve self-added via the API key. See [Auth & security](#auth--security) below.
+**Where to get tokens:** Telegram → [@BotFather](https://t.me/BotFather) send `/newbot`; Discord → [Developer Portal](https://discord.com/developers/applications) → New Application → Bot → Reset Token. If you see “unauthorized”, send `/whoami` or `!whoami` in chat to get your ID, then `openab config set telegram.allowed_user_ids "ID"` (or discord), or send the API key to the bot to self-add. See [Auth & security](#auth--security).
 
 ---
 
@@ -91,11 +87,11 @@ Run `openab run serve` to expose an HTTP API compatible with OpenAI:
 
 | Command | Description |
 |---------|-------------|
-| `openab` | No subcommand: same as `openab run` (target parsed from config `service.run`, default `serve`). |
+| `openab` | With no arguments: show help (same as `openab --help`). Use `openab run` to start a service. |
 | `openab run serve` | Start OpenAI API compatible HTTP server (`POST /v1/chat/completions`, `GET /v1/models`). Optional: `--token` (API key), `--host`, `--port` or config `api.key` / `api.host` / `api.port`. |
 | `openab run telegram` | Run Telegram bot. Optional: `--token`, `--workspace`, `--verbose`. |
 | `openab run discord` | Run Discord bot. Optional: `--token`, `--workspace`, `--verbose`. |
-| `openab run` | No run target: run target is **parsed from config** `service.run` (`serve` \| `telegram` \| `discord`); defaults to `serve` if not set. |
+| `openab run` | No target: if **service.run** is set, use it; otherwise **interactive guide** to choose serve/telegram/discord and save to config. |
 | `openab config path` | Print config file path |
 | `openab config get [key]` | Show config or value at key |
 | `openab config set <key> <value>` | Set config key and save |

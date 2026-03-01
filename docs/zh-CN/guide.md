@@ -8,19 +8,15 @@
 
 ## 新手上路（第一次使用）
 
-按下面步骤即可在几分钟内用上机器人或 API：
-
 1. **安装** — `pip install openab`（需 Python 3.10+）。
-2. **选平台** — 用 **Telegram** 或 **Discord** 聊天，或只用 **HTTP API**（`openab run serve`，无需机器人）。
-3. **拿 Token**  
-   - Telegram： [@BotFather](https://t.me/BotFather) → `/newbot` → 复制 Bot Token。  
-   - Discord： [开发者门户](https://discord.com/developers/applications) → 新建应用 → Bot → 重置 Token。
-4. **写配置** — `mkdir -p ~/.config/openab`，把仓库里的 [config.example.yaml](../../config.example.yaml) 复制为 `config.yaml`，填上 `telegram.bot_token` 或 `discord.bot_token`（也可用 `openab run telegram --token <token>` 传入，不写进文件）。
-5. **加白名单** — 启动机器人后，在聊天里发 `/whoami`（Telegram）或 `!whoami`（Discord）得到你的 ID，然后执行 `openab config set telegram.allowed_user_ids "你的ID"`（或 `discord.allowed_user_ids`）；**或者** 先运行一次 `openab run serve` 记下打印的 API key，再在聊天里把这条 key 原样发给机器人，会自动加白并写回配置。
-6. **运行** — `openab run telegram` 或 `openab run discord`。在应用里打开你的机器人，发任意消息即可与智能体对话。
-7. **会话切换** — 输入 `/resume`（Telegram）或 `!resume`（Discord）会弹出按钮：**延续上一会话**、**创建新会话**、以及从本机 Cursor 会话列表里选一个历史会话（点击即可切换）。
+2. **运行** — 直接执行 `openab run`，按提示完成即可：
+   - 选择启动目标：**1) serve（API）**、**2) telegram**、**3) discord**
+   - 若选 telegram/discord，按提示输入 Bot Token、允许的用户 ID（或稍后在聊天里发 API key 自助加白）
+   - 若未配置 `agent.backend`，会检测环境并让你选择后端（如 Cursor/Codex）
+   - 所有选择会**自动写入** `~/.config/openab/config.yaml`
+3. **开始使用** — 选 serve 则 API 已启动；选 telegram/discord 则在应用里打开机器人发消息即可。会话切换：输入 `/resume`（Telegram）或 `!resume`（Discord）可延续会话或选历史会话。
 
-遇到「未授权」：确认你的用户 ID 已在对应平台的 `allowed_user_ids` 中，或已通过发送 API key 自助加白。更多见下方 [鉴权与安全](#鉴权与安全)。
+**Token 从哪来：** Telegram 找 [@BotFather](https://t.me/BotFather) 发 `/newbot`；Discord 到 [开发者门户](https://discord.com/developers/applications) 新建应用 → Bot → 重置 Token。遇到「未授权」：在聊天里发 `/whoami` 或 `!whoami` 得到 ID 后，用 `openab config set telegram.allowed_user_ids "ID"` 加入白名单，或把 API key 发给机器人自助加白。详见 [鉴权与安全](#鉴权与安全)。
 
 ---
 
@@ -91,11 +87,11 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 
 | 命令 | 说明 |
 |------|------|
-| `openab` | 无子命令时：根据配置自动选择 **serve** / **telegram** / **discord**（同 `openab run`）。 |
+| `openab` | 无任何参数时：显示帮助（等同 `openab --help`）。要运行服务请用 `openab run`。 |
 | `openab run serve` | 启动 OpenAI API 兼容 HTTP 服务（`POST /v1/chat/completions`、`GET /v1/models`）。可选 `--token`（API key）、`--host`、`--port` 或配置 `api.key` / `api.host` / `api.port`。 |
 | `openab run telegram` | 运行 Telegram 机器人。可选 `--token`、`--workspace`、`--verbose`。 |
 | `openab run discord` | 运行 Discord 机器人。可选 `--token`、`--workspace`、`--verbose`。 |
-| `openab run` | 未指定 run 目标时：从配置文件解析 **service.run**（`serve` \| `telegram` \| `discord`），未配置时默认 `serve`。 |
+| `openab run` | 未指定目标时：若已配置 **service.run** 则按配置启动；否则**交互引导**选择 serve/telegram/discord 并写入配置。 |
 | `openab config path` | 打印配置文件路径 |
 | `openab config get [key]` | 显示配置或指定键的值 |
 | `openab config set <key> <value>` | 设置配置键并保存 |
