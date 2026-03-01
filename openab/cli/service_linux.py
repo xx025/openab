@@ -30,12 +30,20 @@ def _escape_exec_start_arg(s: str) -> str:
     return s.replace("\\", "\\\\").replace(" ", "\\ ")
 
 
-def _write_unit_file(path: Path, exec_start: list[str], description: str) -> None:
+def _write_unit_file(
+    path: Path,
+    exec_start: list[str],
+    description: str,
+    config_path_comment: str | None = None,
+) -> None:
     """写入 systemd unit 文件。exec_start 为 [exe, arg1, arg2, ...]。"""
     # ExecStart 格式：参数内空格用 \ 转义（Linux/Mac 路径兼容）
     start_line = " ".join(_escape_exec_start_arg(a) for a in exec_start)
     home = Path.home()
     path_extra = f"{home}/.local/bin:{home}/bin"
+    comment_block = ""
+    if config_path_comment:
+        comment_block = f"# Config file (edit ExecStart --config below to use another):\n# {config_path_comment}\n"
     content = f"""[Unit]
 Description={description}
 After=network-online.target
@@ -43,7 +51,7 @@ After=network-online.target
 [Service]
 Type=simple
 Environment="PATH=/usr/local/bin:/usr/bin:/bin:{path_extra}"
-ExecStart={start_line}
+{comment_block}ExecStart={start_line}
 Restart=on-failure
 RestartSec=10
 
@@ -55,32 +63,42 @@ WantedBy=default.target
 
 def install_user_service(
     *,
+    config_path: Path,
     discord: bool = False,
     start: bool = False,
 ) -> str:
     """
     安装用户级 systemd 服务（仅 Linux）。
-    默认安装的 openab.service 使用「openab run」，启动目标仅从配置文件 service.run 解析；
+    配置文件路径会显式写入 unit 的 ExecStart（--config），便于用户查看和修改。
+    默认安装的 openab.service 使用「openab run --config <path>」，启动目标仅从该配置的 service.run 解析；
     --discord 时安装 openab-discord.service，固定运行 Discord 机器人（可与主服务并存）。
     返回创建的单位文件路径；失败时抛出 RuntimeError。
     """
     if not _is_linux():
         raise RuntimeError("install-service is only supported on Linux")
 
+    resolved_config = config_path.expanduser().resolve()
+    config_arg = str(resolved_config)
+
     SYSTEMD_USER_DIR.mkdir(parents=True, exist_ok=True)
     exe, args = _find_openab_executable()
     exec_list = [exe] + args
     if discord:
-        exec_list = exec_list + ["run", "discord"]
+        exec_list = exec_list + ["run", "discord", "--config", config_arg]
         name = SERVICE_DISCORD_NAME
         description = "OpenAB Discord bot"
     else:
-        # 通过配置启动：openab run 会根据 config 的 service.run 或 token 自动选择 serve/telegram/discord
-        exec_list = exec_list + ["run"]
+        # 通过配置启动：openab run --config <path> 会根据该配置的 service.run 选择 serve/telegram/discord
+        exec_list = exec_list + ["run", "--config", config_arg]
         name = SERVICE_NAME
         description = "OpenAB (config-driven: serve / telegram / discord)"
     unit_path = SYSTEMD_USER_DIR / name
-    _write_unit_file(unit_path, exec_list, description)
+    _write_unit_file(
+        unit_path,
+        exec_list,
+        description,
+        config_path_comment=config_arg,
+    )
 
     subprocess.run(
         ["systemctl", "--user", "daemon-reload"],

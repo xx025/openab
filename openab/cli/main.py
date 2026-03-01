@@ -615,12 +615,15 @@ def install_service(
     try:
         from openab.cli.service_linux import install_user_service
 
+        config_path = get_config_file_path()
         if no_interactive:
             install_telegram = not discord
             install_discord = discord
             start_now = start
+            if (install_telegram or install_discord) and not config_path.is_file():
+                typer.echo(cli_t("install_config_not_found"), err=True)
+                raise typer.Exit(1)
         else:
-            config_path = get_config_file_path()
             if not config_path.is_file():
                 typer.echo(cli_t("install_config_not_found"), err=True)
                 raise typer.Exit(1)
@@ -628,11 +631,11 @@ def install_service(
 
         if install_telegram:
             typer.echo(cli_t("install_wizard_installing_telegram"))
-            path = install_user_service(discord=False, start=start_now)
+            path = install_user_service(config_path=config_path, discord=False, start=start_now)
             typer.echo(cli_t("install_service_done", path=path))
         if install_discord:
             typer.echo(cli_t("install_wizard_installing_discord"))
-            path = install_user_service(discord=True, start=start_now)
+            path = install_user_service(config_path=config_path, discord=True, start=start_now)
             typer.echo(cli_t("install_service_done_discord", path=path))
         if not install_telegram and not install_discord:
             typer.echo(cli_t("install_service_linux_only"), err=True)
