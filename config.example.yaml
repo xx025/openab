@@ -31,6 +31,7 @@ discord:
 # cursor:
 #   cmd: agent
 #   continue_session: true   # 使用上一会话（agent --continue），默认 true
+#   allow_code_execution: true   # 是否允许执行命令/代码（对应 agent --force），默认 true；设为 false 则只读/规划
 # openclaw:   # 需先安装 npm i -g openclaw 并运行 openclaw gateway
 #   cmd: openclaw
 #   thinking: off   # off | minimal | low | medium | high | xhigh

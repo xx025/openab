@@ -21,7 +21,23 @@ def _find_cmd(agent_config: dict[str, Any] | None = None) -> str:
     if os.path.isabs(cmd):
         return cmd
     exe = shutil.which(cmd)
-    return exe or cmd
+    if exe:
+        return exe
+    # systemd 等环境 PATH 精简，在常见路径中查找
+    for base in ("/usr/local/bin", os.path.expanduser("~/.local/bin"), os.path.expanduser("~/bin")):
+        candidate = os.path.join(base, cmd)
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return cmd
+
+
+def _allow_code_execution(agent_config: dict[str, Any] | None) -> bool:
+    """是否允许 agent 执行命令/代码。默认 True。配置 cursor.allow_code_execution 可覆盖。"""
+    if agent_config:
+        c = agent_config.get("cursor") or {}
+        if "allow_code_execution" in c:
+            return bool(c["allow_code_execution"])
+    return True
 
 
 def _use_continue_session(agent_config: dict[str, Any] | None) -> bool:
@@ -72,6 +88,8 @@ async def run_async(
         "--output-format", "text",
         "--trust",
     ]
+    if _allow_code_execution(agent_config):
+        base_args.append("--force")
     use_new, resume_id = _cursor_session_override(agent_config)
     if use_new:
         pass  # 不传 --continue 也不传 --resume，即新会话
@@ -85,6 +103,11 @@ async def run_async(
     env = os.environ.copy()
     # 减少子进程 stdout 缓冲，便于尽早拿到输出（非 TTY 时 Cursor/Node 常为块缓冲）
     env.setdefault("PYTHONUNBUFFERED", "1")
+    # systemd 等环境 PATH 较精简，子进程可能找不到 agent；追加常见安装路径
+    if not os.path.isabs(cmd):
+        extra = ["/usr/local/bin", os.path.expanduser("~/.local/bin"), os.path.expanduser("~/bin")]
+        existing = env.get("PATH", "")
+        env["PATH"] = (existing + ":" + ":".join(extra)) if existing else ":".join(extra)
     proc = await asyncio.create_subprocess_exec(
         *base_args,
         stdout=asyncio.subprocess.PIPE,

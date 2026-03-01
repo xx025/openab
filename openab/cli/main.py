@@ -578,81 +578,23 @@ def allowlist_add(
     typer.echo(cli_t("allowlist_add_done", user_id=user_id, platform=platform))
 
 
-def _install_wizard() -> tuple[bool, bool, bool]:
+def _install_choice_when_has_config() -> tuple[bool, bool, bool]:
     """
-    交互式引导：选择安装 Telegram / Discord / 两者，补全配置，询问是否立即启动。
-    返回 (install_telegram, install_discord, start_now)。
+    以配置文件为主导：仅让用户选择要安装的服务（主服务 / Discord 专用 / 两者）及是否立即启动。
+    调用前需已确认配置文件存在。
+    返回 (install_main, install_discord, start_now)。
     """
-    typer.echo(cli_t("install_wizard_title"))
+    config_path = get_config_file_path()
     typer.echo("")
-    typer.echo(cli_t("install_wizard_which"))
-    choice = input(cli_t("install_wizard_which_prompt")).strip() or "1"
-    install_telegram = choice in ("1", "3")
+    typer.echo(cli_t("install_config_used_choose", path=str(config_path)))
+    try:
+        choice = input(cli_t("install_wizard_which_prompt")).strip() or "1"
+    except (EOFError, KeyboardInterrupt):
+        choice = "1"
+    install_main = choice in ("1", "3")
     install_discord = choice in ("2", "3")
-    if not install_telegram and not install_discord:
-        install_telegram = True
-
-    config = load_config()
-    config_path = get_config_path()
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    changed = False
-
-    # 检测并引导选择 agent 后端
-    available = detect_available_backends()
-    cmd_by_backend = dict(BACKEND_CLI_NAMES)
-    current_backend = (config.get("agent") or {}).get("backend") or "cursor"
-    current_backend = str(current_backend).strip().lower()
-    if available:
-        typer.echo("")
-        typer.echo(cli_t("install_wizard_backends_detected"))
-        for i, (bid, _) in enumerate(available, 1):
-            cmd = cmd_by_backend.get(bid, bid)
-            typer.echo(f"  {i}) {bid} ({cmd})")
-        backend_ids = [b[0] for b in available]
-        if current_backend == "agent":
-            current_backend = "cursor"
-        if current_backend not in backend_ids:
-            try:
-                raw = input(cli_t("install_wizard_backend_prompt", n=len(available))).strip() or "1"
-                idx = int(raw)
-                if 1 <= idx <= len(available):
-                    current_backend = available[idx - 1][0]
-                    _set_nested(config, "agent.backend", current_backend)
-                    changed = True
-            except (ValueError, EOFError, KeyboardInterrupt):
-                pass
-    else:
-        typer.echo("")
-        typer.echo(cli_t("install_wizard_backend_none"))
-
-    if install_telegram:
-        tg = config.setdefault("telegram", {})
-        if not (tg.get("bot_token") or "").strip():
-            val = input(cli_t("install_wizard_telegram_token")).strip()
-            if val:
-                _set_nested(config, "telegram.bot_token", val)
-                changed = True
-        if not parse_allowed_user_ids(tg.get("allowed_user_ids")):
-            val = input(cli_t("install_wizard_telegram_allowed")).strip()
-            if val:
-                _set_nested(config, "telegram.allowed_user_ids", coerce_config_value("telegram.allowed_user_ids", val))
-                changed = True
-    if install_discord:
-        dc = config.setdefault("discord", {})
-        if not (dc.get("bot_token") or "").strip():
-            val = input(cli_t("install_wizard_discord_token")).strip()
-            if val:
-                _set_nested(config, "discord.bot_token", val)
-                changed = True
-        if not parse_allowed_user_ids(dc.get("allowed_user_ids")):
-            val = input(cli_t("install_wizard_discord_allowed")).strip()
-            if val:
-                _set_nested(config, "discord.allowed_user_ids", coerce_config_value("discord.allowed_user_ids", val))
-                changed = True
-
-    if changed:
-        path = save_config(config)
-        typer.echo(cli_t("install_wizard_config_saved", path=path))
+    if not install_main and not install_discord:
+        install_main = True
 
     start_now = False
     try:
@@ -660,7 +602,7 @@ def _install_wizard() -> tuple[bool, bool, bool]:
         start_now = ans in ("y", "yes")
     except (EOFError, KeyboardInterrupt):
         pass
-    return install_telegram, install_discord, start_now
+    return install_main, install_discord, start_now
 
 
 @app.command("install-service", help=cli_t("install_service_help"))
@@ -678,7 +620,11 @@ def install_service(
             install_discord = discord
             start_now = start
         else:
-            install_telegram, install_discord, start_now = _install_wizard()
+            config_path = get_config_file_path()
+            if not config_path.is_file():
+                typer.echo(cli_t("install_config_not_found"), err=True)
+                raise typer.Exit(1)
+            install_telegram, install_discord, start_now = _install_choice_when_has_config()
 
         if install_telegram:
             typer.echo(cli_t("install_wizard_installing_telegram"))
@@ -703,6 +649,39 @@ def install_service(
     except subprocess.CalledProcessError as e:
         typer.echo(f"systemctl failed: {e}", err=True)
         raise typer.Exit(1)
+
+
+@app.command("restart-service", help=cli_t("restart_service_help"))
+def restart_service(
+    discord: bool = typer.Option(False, "--discord", help="Only restart openab-discord.service."),
+    main_only: bool = typer.Option(False, "--main", help="Only restart openab.service (main service)."),
+) -> None:
+    """Restart installed user-level systemd service(s) (Linux only)."""
+    try:
+        from openab.cli.service_linux import restart_user_services
+    except ImportError:
+        typer.echo(cli_t("install_service_linux_only"), err=True)
+        raise typer.Exit(1)
+    try:
+        if discord:
+            restarted = restart_user_services(discord=True)
+        elif main_only:
+            restarted = restart_user_services(discord=False)
+        else:
+            restarted = restart_user_services(all_services=True)
+    except RuntimeError as e:
+        if "only supported on Linux" in str(e):
+            typer.echo(cli_t("install_service_linux_only"), err=True)
+        else:
+            typer.echo(str(e), err=True)
+        raise typer.Exit(1)
+    except subprocess.CalledProcessError as e:
+        typer.echo(f"systemctl failed: {e}", err=True)
+        raise typer.Exit(1)
+    if restarted:
+        typer.echo(cli_t("restart_service_done", names=", ".join(restarted)))
+    else:
+        typer.echo(cli_t("restart_service_none"))
 
 
 @app.command("uninstall-service", help=cli_t("uninstall_service_help"))

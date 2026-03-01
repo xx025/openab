@@ -34,12 +34,15 @@ def _write_unit_file(path: Path, exec_start: list[str], description: str) -> Non
     """写入 systemd unit 文件。exec_start 为 [exe, arg1, arg2, ...]。"""
     # ExecStart 格式：参数内空格用 \ 转义（Linux/Mac 路径兼容）
     start_line = " ".join(_escape_exec_start_arg(a) for a in exec_start)
+    home = Path.home()
+    path_extra = f"{home}/.local/bin:{home}/bin"
     content = f"""[Unit]
 Description={description}
 After=network-online.target
 
 [Service]
 Type=simple
+Environment="PATH=/usr/local/bin:/usr/bin:/bin:{path_extra}"
 ExecStart={start_line}
 Restart=on-failure
 RestartSec=10
@@ -136,3 +139,32 @@ def uninstall_user_services(*, discord: bool = False, all_services: bool = False
             capture_output=True,
         )
     return removed
+
+
+def restart_user_services(*, discord: bool = False, all_services: bool = False) -> list[str]:
+    """
+    重启已安装的用户级 systemd 服务（仅 Linux）。
+    discord=False 且 all_services=False：只重启 openab.service；
+    discord=True：只重启 openab-discord.service；
+    all_services=True：重启 openab.service 与 openab-discord.service。
+    返回已执行 restart 的服务名列表；unit 不存在则跳过，不抛错。
+    """
+    if not _is_linux():
+        raise RuntimeError("restart-service is only supported on Linux")
+
+    if all_services:
+        names = [SERVICE_NAME, SERVICE_DISCORD_NAME]
+    else:
+        names = [SERVICE_DISCORD_NAME] if discord else [SERVICE_NAME]
+    restarted: list[str] = []
+    for name in names:
+        unit_path = SYSTEMD_USER_DIR / name
+        if not unit_path.is_file():
+            continue
+        subprocess.run(
+            ["systemctl", "--user", "restart", name],
+            check=True,
+            capture_output=True,
+        )
+        restarted.append(name)
+    return restarted
