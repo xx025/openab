@@ -13,6 +13,7 @@ import typer
 from dotenv import load_dotenv
 
 from openab.chats.discord import run_bot as run_discord_bot
+from openab.chats.mattermost import run_bot as run_mattermost_bot
 from openab.chats.telegram import run_bot as run_telegram_bot
 from openab.core.config import (
     coerce_config_value,
@@ -20,6 +21,7 @@ from openab.core.config import (
     get_config_file_path,
     load_config,
     parse_allowed_user_ids,
+    parse_allowed_user_ids_str,
     resolve_workspace,
     save_config,
     _get_nested,
@@ -60,10 +62,11 @@ def _get_workspace(config: dict, workspace: Optional[Path]) -> Path:
 
 
 def _config_empty(config: dict) -> bool:
-    """配置为空或未配置（无 Telegram/Discord token）时视为空，可默认 run serve。"""
+    """配置为空或未配置（无 Telegram/Discord/Mattermost token）时视为空，可默认 run serve。"""
     tg = (config.get("telegram") or {}).get("bot_token") or ""
     dc = (config.get("discord") or {}).get("bot_token") or ""
-    return (not (tg and str(tg).strip())) and (not (dc and str(dc).strip()))
+    mm = (config.get("mattermost") or {}).get("bot_token") or ""
+    return not any(str(x).strip() for x in (tg, dc, mm))
 
 
 def _is_interactive() -> bool:
@@ -160,6 +163,76 @@ def _ensure_discord_run_config(
         except (EOFError, KeyboardInterrupt):
             pass
     return (t, allowed, config)
+
+
+def _ensure_mattermost_run_config(
+    config: dict, server_url_cli: Optional[str], token_cli: Optional[str]
+) -> tuple[str, str, frozenset[str], dict]:
+    """若配置/CLI 无 server_url 或 token 且在交互环境则引导输入并保存；返回 (server_url, token, allowed_user_ids, config)。"""
+    mm = config.get("mattermost") or {}
+    url = (server_url_cli or "").strip() or str(mm.get("server_url") or "").strip()
+    if not url and _is_interactive():
+        try:
+            url = input(cli_t("run_prompt_mattermost_url")).strip()
+            if url:
+                config.setdefault("mattermost", {})["server_url"] = url
+                get_config_path().parent.mkdir(parents=True, exist_ok=True)
+                save_config(config)
+        except (EOFError, KeyboardInterrupt):
+            pass
+    if not url:
+        typer.echo(cli_t("err_no_url_mattermost"), err=True)
+        raise typer.Exit(1)
+    t = (token_cli or "").strip() or str(mm.get("bot_token") or "").strip()
+    if not t and _is_interactive():
+        try:
+            t = input(cli_t("run_prompt_mattermost_token")).strip()
+            if t:
+                config.setdefault("mattermost", {})["bot_token"] = t
+                get_config_path().parent.mkdir(parents=True, exist_ok=True)
+                save_config(config)
+        except (EOFError, KeyboardInterrupt):
+            pass
+    if not t:
+        typer.echo(cli_t("err_no_token_mattermost"), err=True)
+        raise typer.Exit(1)
+    allowed = parse_allowed_user_ids_str((config.get("mattermost") or {}).get("allowed_user_ids"))
+    if not allowed and _is_interactive():
+        try:
+            val = input(cli_t("run_prompt_allowed_mattermost")).strip()
+            if val:
+                ids = coerce_config_value("mattermost.allowed_user_ids", val)
+                _set_nested(config, "mattermost.allowed_user_ids", ids)
+                save_config(config)
+                allowed = parse_allowed_user_ids_str(ids)
+        except (EOFError, KeyboardInterrupt):
+            pass
+    return (url, t, allowed, config)
+
+
+def _run_mattermost_from_config(cfg: dict, server_url_cli: Optional[str] = None, token_cli: Optional[str] = None) -> None:
+    """启动 Mattermost 机器人：三个入口（默认命令、run 默认、run mattermost）共用。"""
+    cfg = _ensure_agent_backend(cfg)
+    url, t, allowed, cfg = _ensure_mattermost_run_config(cfg, server_url_cli, token_cli)
+    ws = _get_workspace(cfg, None)
+    timeout = (cfg.get("agent") or {}).get("timeout")
+    timeout = int(timeout) if timeout is not None else 300
+    allow_all = (cfg.get("mattermost") or {}).get("allow_all") is True
+    if not allowed and not allow_all:
+        typer.echo(cli_t("allowlist_empty_warning"), err=True)
+    if allow_all:
+        _echo_severe_warning(cli_t("allow_all_severe_warning"))
+    typer.echo(cli_t("starting_mattermost"))
+    run_mattermost_bot(
+        url,
+        t,
+        workspace=ws,
+        timeout=timeout,
+        allowed_user_ids=allowed,
+        allow_all=allow_all,
+        config_path=get_config_file_path(),
+        agent_config=cfg,
+    )
 
 
 def _ensure_api_key(config: dict) -> dict:
@@ -264,6 +337,11 @@ def _default(
         typer.echo(cli_t("starting_discord"))
         run_discord_bot(t, workspace=ws, timeout=timeout, allowed_user_ids=allowed, allow_all=allow_all, config_path=get_config_file_path(), agent_config=cfg)
         return
+    if target == "mattermost":
+        _echo_config_file_path()
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+        _run_mattermost_from_config(cfg)
+        return
     typer.echo(cli_t("default_show_help"))
     raise typer.Exit(0)
 
@@ -273,19 +351,19 @@ run_app = typer.Typer(help=cli_t("run_help"), no_args_is_help=False, invoke_with
 
 def _resolve_run_target_from_config(config: dict) -> str:
     """
-    从配置文件中解析 run 目标：仅读取 service.run（serve | telegram | discord），
+    从配置文件中解析 run 目标：仅读取 service.run（serve | telegram | discord | mattermost），
     未配置或无效时返回空字符串（表示需引导或默认 serve）。
     """
     svc = (config.get("service") or {})
     run = (svc.get("run") or "").strip().lower()
-    if run in ("serve", "telegram", "discord"):
+    if run in ("serve", "telegram", "discord", "mattermost"):
         return run
     return ""
 
 
 def _prompt_run_target(config: dict) -> str:
     """
-    交互式引导用户选择启动目标（serve / telegram / discord），可选写入 service.run。
+    交互式引导用户选择启动目标（serve / telegram / discord / mattermost），可选写入 service.run。
     非交互环境直接返回 serve。
     """
     if not _is_interactive():
@@ -300,6 +378,8 @@ def _prompt_run_target(config: dict) -> str:
             choice = "telegram"
         elif raw == "3":
             choice = "discord"
+        elif raw == "4":
+            choice = "mattermost"
         else:
             choice = "serve"
         config.setdefault("service", {})["run"] = choice
@@ -384,6 +464,14 @@ def _run_default(
             config_path=get_config_file_path(),
             agent_config=cfg,
         )
+        return
+    if target == "mattermost":
+        _echo_config_file_path()
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        )
+        _run_mattermost_from_config(cfg)
         return
     typer.echo(cli_t("default_show_help_run"))
     raise typer.Exit(0)
@@ -478,6 +566,46 @@ def run_discord(
     )
 
 
+@run_app.command("mattermost", help=cli_t("run_mattermost_help"))
+def run_mattermost(
+    server_url: Optional[str] = typer.Option(None, "--server-url", "-s", help=cli_t("opt_server_url_mattermost")),
+    token: Optional[str] = typer.Option(None, "--token", "-t", help=cli_t("opt_token_mattermost")),
+    workspace: Optional[Path] = typer.Option(None, "--workspace", "-w", path_type=Path, help=cli_t("opt_workspace")),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help=cli_t("opt_verbose")),
+    config_path: Optional[Path] = typer.Option(None, "--config", "-c", path_type=Path, help=cli_t("opt_config")),
+) -> None:
+    """Run Mattermost bot (WebSocket)."""
+    if config_path is not None:
+        os.environ["OPENAB_CONFIG"] = str(config_path.expanduser().resolve())
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    config = load_config()
+    _echo_config_file_path()
+    config = _ensure_agent_backend(config)
+    url, t, allowed, config = _ensure_mattermost_run_config(config, server_url, token)
+    ws = _get_workspace(config, workspace)
+    timeout = (config.get("agent") or {}).get("timeout")
+    timeout = int(timeout) if timeout is not None else 300
+    allow_all = (config.get("mattermost") or {}).get("allow_all") is True
+    if not allowed and not allow_all:
+        typer.echo(cli_t("allowlist_empty_warning"), err=True)
+    if allow_all:
+        _echo_severe_warning(cli_t("allow_all_severe_warning"))
+    typer.echo(cli_t("starting_mattermost"))
+    run_mattermost_bot(
+        url,
+        t,
+        workspace=ws,
+        timeout=timeout,
+        allowed_user_ids=allowed,
+        allow_all=allow_all,
+        config_path=get_config_file_path(),
+        agent_config=config,
+    )
+
+
 app.add_typer(run_app, name="run")
 
 
@@ -561,28 +689,44 @@ app.add_typer(allowlist_app, name="allowlist")
 
 @allowlist_app.command("add")
 def allowlist_add(
-    user_id: int = typer.Argument(..., help="User ID to add (Telegram or Discord numeric ID)."),
+    user_id: str = typer.Argument(..., help="User ID to add (Telegram/Discord numeric ID, or Mattermost ID)."),
     discord: bool = typer.Option(False, "--discord", help="Add to Discord allowlist (default: Telegram)."),
+    mattermost: bool = typer.Option(False, "--mattermost", help="Add to Mattermost allowlist (IDs are strings)."),
 ) -> None:
     """Add a user ID to the allowlist and save config."""
     cfg = load_config()
+    if mattermost:
+        key = "mattermost.allowed_user_ids"
+        current_str = parse_allowed_user_ids_str(_get_nested(cfg, key))
+        uid = user_id.strip()
+        if uid in current_str:
+            typer.echo(f"{uid} already in allowlist.", err=True)
+            raise typer.Exit(0)
+        _set_nested(cfg, key, sorted(current_str | {uid}))
+        save_config(cfg)
+        typer.echo(cli_t("allowlist_add_done", user_id=uid, platform="Mattermost"))
+        return
+    if not user_id.strip().isdigit():
+        typer.echo("Telegram/Discord user IDs are numeric; for Mattermost pass --mattermost.", err=True)
+        raise typer.Exit(1)
+    numeric_id = int(user_id.strip())
     key = "discord.allowed_user_ids" if discord else "telegram.allowed_user_ids"
     current = parse_allowed_user_ids(_get_nested(cfg, key))
-    if user_id in current:
-        typer.echo(f"{user_id} already in allowlist.", err=True)
+    if numeric_id in current:
+        typer.echo(f"{numeric_id} already in allowlist.", err=True)
         raise typer.Exit(0)
-    new_list = list(current) + [user_id]
+    new_list = list(current) + [numeric_id]
     _set_nested(cfg, key, new_list)
     save_config(cfg)
     platform = "Discord" if discord else "Telegram"
-    typer.echo(cli_t("allowlist_add_done", user_id=user_id, platform=platform))
+    typer.echo(cli_t("allowlist_add_done", user_id=numeric_id, platform=platform))
 
 
 def _install_choice_when_has_config() -> tuple[bool, bool, bool]:
     """
     以配置文件为主导：仅让用户选择要安装的服务（主服务 / Discord 专用 / 两者）及是否立即启动。
     调用前需已确认配置文件存在。
-    返回 (install_main, install_discord, start_now)。
+    返回 (install_main, install_discord, install_mattermost, start_now)。
     """
     config_path = get_config_file_path()
     typer.echo("")
@@ -591,9 +735,10 @@ def _install_choice_when_has_config() -> tuple[bool, bool, bool]:
         choice = input(cli_t("install_wizard_which_prompt")).strip() or "1"
     except (EOFError, KeyboardInterrupt):
         choice = "1"
-    install_main = choice in ("1", "3")
-    install_discord = choice in ("2", "3")
-    if not install_main and not install_discord:
+    install_main = choice in ("1", "4")
+    install_discord = choice in ("2", "4")
+    install_mattermost = choice in ("3", "4")
+    if not install_main and not install_discord and not install_mattermost:
         install_main = True
 
     start_now = False
@@ -602,12 +747,13 @@ def _install_choice_when_has_config() -> tuple[bool, bool, bool]:
         start_now = ans in ("y", "yes")
     except (EOFError, KeyboardInterrupt):
         pass
-    return install_main, install_discord, start_now
+    return install_main, install_discord, install_mattermost, start_now
 
 
 @app.command("install-service", help=cli_t("install_service_help"))
 def install_service(
     discord: bool = typer.Option(False, "--discord", help="Install Discord bot service (openab-discord.service) instead of Telegram."),
+    mattermost: bool = typer.Option(False, "--mattermost", help="Install Mattermost bot service (openab-mattermost.service)."),
     start: bool = typer.Option(False, "--start", help="Start the service immediately after enable."),
     no_interactive: bool = typer.Option(False, "--no-interactive", help=cli_t("install_wizard_skip_interactive")),
 ) -> None:
@@ -617,27 +763,32 @@ def install_service(
 
         config_path = get_config_file_path()
         if no_interactive:
-            install_telegram = not discord
+            install_telegram = not discord and not mattermost
             install_discord = discord
+            install_mattermost = mattermost
             start_now = start
-            if (install_telegram or install_discord) and not config_path.is_file():
+            if not config_path.is_file():
                 typer.echo(cli_t("install_config_not_found"), err=True)
                 raise typer.Exit(1)
         else:
             if not config_path.is_file():
                 typer.echo(cli_t("install_config_not_found"), err=True)
                 raise typer.Exit(1)
-            install_telegram, install_discord, start_now = _install_choice_when_has_config()
+            install_telegram, install_discord, install_mattermost, start_now = _install_choice_when_has_config()
 
         if install_telegram:
             typer.echo(cli_t("install_wizard_installing_telegram"))
-            path = install_user_service(config_path=config_path, discord=False, start=start_now)
+            path = install_user_service(config_path=config_path, start=start_now)
             typer.echo(cli_t("install_service_done", path=path))
         if install_discord:
             typer.echo(cli_t("install_wizard_installing_discord"))
             path = install_user_service(config_path=config_path, discord=True, start=start_now)
             typer.echo(cli_t("install_service_done_discord", path=path))
-        if not install_telegram and not install_discord:
+        if install_mattermost:
+            typer.echo(cli_t("install_wizard_installing_mattermost"))
+            path = install_user_service(config_path=config_path, mattermost=True, start=start_now)
+            typer.echo(cli_t("install_service_done_mattermost", path=path))
+        if not install_telegram and not install_discord and not install_mattermost:
             typer.echo(cli_t("install_service_linux_only"), err=True)
             raise typer.Exit(1)
         typer.echo(cli_t("install_wizard_done"))
@@ -657,6 +808,7 @@ def install_service(
 @app.command("restart-service", help=cli_t("restart_service_help"))
 def restart_service(
     discord: bool = typer.Option(False, "--discord", help="Only restart openab-discord.service."),
+    mattermost: bool = typer.Option(False, "--mattermost", help="Only restart openab-mattermost.service."),
     main_only: bool = typer.Option(False, "--main", help="Only restart openab.service (main service)."),
 ) -> None:
     """Restart installed user-level systemd service(s) (Linux only)."""
@@ -668,8 +820,10 @@ def restart_service(
     try:
         if discord:
             restarted = restart_user_services(discord=True)
+        elif mattermost:
+            restarted = restart_user_services(mattermost=True)
         elif main_only:
-            restarted = restart_user_services(discord=False)
+            restarted = restart_user_services()
         else:
             restarted = restart_user_services(all_services=True)
     except RuntimeError as e:
@@ -690,6 +844,7 @@ def restart_service(
 @app.command("uninstall-service", help=cli_t("uninstall_service_help"))
 def uninstall_service(
     discord: bool = typer.Option(False, "--discord", help="Only remove openab-discord.service."),
+    mattermost: bool = typer.Option(False, "--mattermost", help="Only remove openab-mattermost.service."),
     main_only: bool = typer.Option(False, "--main", help="Only remove openab.service (main service)."),
     remove_config: bool = typer.Option(False, "--config", "-c", help="Also delete the config file (e.g. ~/.config/openab/config.yaml)."),
 ) -> None:
@@ -702,8 +857,10 @@ def uninstall_service(
     try:
         if discord:
             removed = uninstall_user_services(discord=True)
+        elif mattermost:
+            removed = uninstall_user_services(mattermost=True)
         elif main_only:
-            removed = uninstall_user_services(discord=False)
+            removed = uninstall_user_services()
         else:
             removed = uninstall_user_services(all_services=True)
     except RuntimeError as e:

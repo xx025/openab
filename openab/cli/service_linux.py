@@ -11,6 +11,7 @@ from pathlib import Path
 SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
 SERVICE_NAME = "openab.service"
 SERVICE_DISCORD_NAME = "openab-discord.service"
+SERVICE_MATTERMOST_NAME = "openab-mattermost.service"
 
 
 def _is_linux() -> bool:
@@ -65,13 +66,14 @@ def install_user_service(
     *,
     config_path: Path,
     discord: bool = False,
+    mattermost: bool = False,
     start: bool = False,
 ) -> str:
     """
     安装用户级 systemd 服务（仅 Linux）。
     配置文件路径会显式写入 unit 的 ExecStart（--config），便于用户查看和修改。
     默认安装的 openab.service 使用「openab run --config <path>」，启动目标仅从该配置的 service.run 解析；
-    --discord 时安装 openab-discord.service，固定运行 Discord 机器人（可与主服务并存）。
+    --discord / --mattermost 时安装对应专用服务，固定运行该平台机器人（可与主服务并存）。
     返回创建的单位文件路径；失败时抛出 RuntimeError。
     """
     if not _is_linux():
@@ -87,11 +89,15 @@ def install_user_service(
         exec_list = exec_list + ["run", "discord", "--config", config_arg]
         name = SERVICE_DISCORD_NAME
         description = "OpenAB Discord bot"
+    elif mattermost:
+        exec_list = exec_list + ["run", "mattermost", "--config", config_arg]
+        name = SERVICE_MATTERMOST_NAME
+        description = "OpenAB Mattermost bot"
     else:
-        # 通过配置启动：openab run --config <path> 会根据该配置的 service.run 选择 serve/telegram/discord
+        # 通过配置启动：openab run --config <path> 会根据该配置的 service.run 选择 serve/telegram/discord/mattermost
         exec_list = exec_list + ["run", "--config", config_arg]
         name = SERVICE_NAME
-        description = "OpenAB (config-driven: serve / telegram / discord)"
+        description = "OpenAB (config-driven: serve / telegram / discord / mattermost)"
     unit_path = SYSTEMD_USER_DIR / name
     _write_unit_file(
         unit_path,
@@ -119,12 +125,13 @@ def install_user_service(
     return str(unit_path)
 
 
-def uninstall_user_services(*, discord: bool = False, all_services: bool = False) -> list[str]:
+def uninstall_user_services(
+    *, discord: bool = False, mattermost: bool = False, all_services: bool = False
+) -> list[str]:
     """
     卸载用户级 systemd 服务（仅 Linux）。
-    discord=False 且 all_services=False：只卸载 openab.service；
-    discord=True：只卸载 openab-discord.service；
-    all_services=True：卸载 openab.service 与 openab-discord.service。
+    无标志：只卸载 openab.service；discord=True / mattermost=True：只卸载对应专用服务；
+    all_services=True：卸载全部三个。
     先 stop、disable，再删除 unit 文件，最后 daemon-reload。
     返回已删除的 unit 文件路径列表；若本来就不存在则跳过，不抛错。
     """
@@ -133,9 +140,13 @@ def uninstall_user_services(*, discord: bool = False, all_services: bool = False
 
     removed: list[str] = []
     if all_services:
-        names = [SERVICE_NAME, SERVICE_DISCORD_NAME]
+        names = [SERVICE_NAME, SERVICE_DISCORD_NAME, SERVICE_MATTERMOST_NAME]
+    elif discord:
+        names = [SERVICE_DISCORD_NAME]
+    elif mattermost:
+        names = [SERVICE_MATTERMOST_NAME]
     else:
-        names = [SERVICE_DISCORD_NAME] if discord else [SERVICE_NAME]
+        names = [SERVICE_NAME]
     for name in names:
         unit_path = SYSTEMD_USER_DIR / name
         if not unit_path.is_file():
@@ -159,21 +170,26 @@ def uninstall_user_services(*, discord: bool = False, all_services: bool = False
     return removed
 
 
-def restart_user_services(*, discord: bool = False, all_services: bool = False) -> list[str]:
+def restart_user_services(
+    *, discord: bool = False, mattermost: bool = False, all_services: bool = False
+) -> list[str]:
     """
     重启已安装的用户级 systemd 服务（仅 Linux）。
-    discord=False 且 all_services=False：只重启 openab.service；
-    discord=True：只重启 openab-discord.service；
-    all_services=True：重启 openab.service 与 openab-discord.service。
+    无标志：只重启 openab.service；discord=True / mattermost=True：只重启对应专用服务；
+    all_services=True：重启全部三个。
     返回已执行 restart 的服务名列表；unit 不存在则跳过，不抛错。
     """
     if not _is_linux():
         raise RuntimeError("restart-service is only supported on Linux")
 
     if all_services:
-        names = [SERVICE_NAME, SERVICE_DISCORD_NAME]
+        names = [SERVICE_NAME, SERVICE_DISCORD_NAME, SERVICE_MATTERMOST_NAME]
+    elif discord:
+        names = [SERVICE_DISCORD_NAME]
+    elif mattermost:
+        names = [SERVICE_MATTERMOST_NAME]
     else:
-        names = [SERVICE_DISCORD_NAME] if discord else [SERVICE_NAME]
+        names = [SERVICE_NAME]
     restarted: list[str] = []
     for name in names:
         unit_path = SYSTEMD_USER_DIR / name

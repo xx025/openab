@@ -1,6 +1,6 @@
 # OpenAB — 配置与使用说明
 
-配置、智能体后端、命令与安全的技术参考。当前聊天前端包括 Telegram 与 Discord，后续可能增加更多平台。
+配置、智能体后端、命令与安全的技术参考。当前聊天前端包括 Telegram、Discord 与 Mattermost，后续可能增加更多平台。
 
 [English](../en/guide.md) · **中文**
 
@@ -10,17 +10,17 @@
 
 1. **安装** — `pip install openab`（需 Python 3.10+）。
 2. **运行** — 直接执行 `openab run`，按提示完成即可：
-   - 选择启动目标：**1) serve（API）**、**2) telegram**、**3) discord**
-   - 若选 telegram/discord，按提示输入 Bot Token、允许的用户 ID（或稍后在聊天里发 API key 自助加白）
+   - 选择启动目标：**1) serve（API）**、**2) telegram**、**3) discord**、**4) mattermost**
+   - 若选 telegram/discord/mattermost，按提示输入 Bot Token（Mattermost 还需服务器地址）、允许的用户 ID（或稍后在聊天里发 API key 自助加白）
    - 若未配置 `agent.backend`，会检测环境并让你选择后端（如 Cursor/Codex）
    - 所有选择会**自动写入** `~/.config/openab/config.yaml`
-3. **开始使用** — 选 serve 则 API 已启动；选 telegram/discord 则在应用里打开机器人发消息即可。会话切换：输入 `/resume`（Telegram）或 `!resume`（Discord）可延续会话或选历史会话。
+3. **开始使用** — 选 serve 则 API 已启动；选 telegram/discord/mattermost 则在应用里打开机器人发消息即可（Mattermost 里私信机器人，或在频道 @它）。会话切换：输入 `/resume`（Telegram）或 `!resume`（Discord/Mattermost）可延续会话或选历史会话。
 
-**Token 从哪来：** Telegram 找 [@BotFather](https://t.me/BotFather) 发 `/newbot`；Discord 到 [开发者门户](https://discord.com/developers/applications) 新建应用 → Bot → 重置 Token。遇到「未授权」：在聊天里发 `/whoami` 或 `!whoami` 得到 ID 后，用 `openab config set telegram.allowed_user_ids "ID"` 加入白名单，或把 API key 发给机器人自助加白。详见 [鉴权与安全](#鉴权与安全)。
+**Token 从哪来：** Telegram 找 [@BotFather](https://t.me/BotFather) 发 `/newbot`；Discord 到 [开发者门户](https://discord.com/developers/applications) 新建应用 → Bot → 重置 Token；Mattermost 在系统控制台 → 集成 → 机器人账户 中创建（需先允许创建机器人账户），并记下服务器地址。遇到「未授权」：在聊天里发 `/whoami` 或 `!whoami` 得到 ID 后，用 `openab config set telegram.allowed_user_ids "ID"` 加入白名单（Mattermost 用 `openab allowlist add --mattermost <ID>`），或把 API key 发给机器人自助加白。详见 [鉴权与安全](#鉴权与安全)。
 
 ---
 
-**运行环境：** OpenAB 支持 **Linux** 与 **macOS**。所有 CLI 命令（`openab run serve`、`openab run telegram`、`openab run discord`、`openab config`、各智能体后端）在两者上均可使用。**install-service**（systemd 用户服务）**仅支持 Linux**；在 macOS 上请直接运行 `openab run telegram` 或 `openab run discord`。
+**运行环境：** OpenAB 支持 **Linux** 与 **macOS**。所有 CLI 命令（`openab run serve`、`openab run telegram`、`openab run discord`、`openab config`、各智能体后端）在两者上均可使用。**install-service**（systemd 用户服务）**仅支持 Linux**；在 macOS 上请直接运行 `openab run telegram`、`openab run discord` 或 `openab run mattermost`。
 
 ---
 
@@ -46,6 +46,9 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 | `telegram.allowed_user_ids` | 运行 `run` 时 | Telegram 用户 ID 列表。空则无人可用。用户可用 `/whoami` 查看自己的 ID。 |
 | `discord.bot_token` | 运行 `run discord` 时 | 来自 [Discord 开发者门户](https://discord.com/developers/applications) 的 Bot Token；也可用 `openab run discord --token <token>` 传入。 |
 | `discord.allowed_user_ids` | 运行 `run discord` 时 | Discord 用户 ID 列表。空则无人可用。用户可在私信中用 `!whoami` 查看 ID。 |
+| `mattermost.server_url` | 运行 `run mattermost` 时 | Mattermost 服务器地址，如 `https://mattermost.example.com`；也可用 `openab run mattermost --server-url <url>` 传入。 |
+| `mattermost.bot_token` | 运行 `run mattermost` 时 | 系统控制台 → 集成 → 机器人账户 创建后生成的 token；也可用 `openab run mattermost --token <token>` 传入。 |
+| `mattermost.allowed_user_ids` | 运行 `run mattermost` 时 | Mattermost 用户 ID 列表（26 位**字符串**，不是数字）。空则无人可用。用户可用 `!whoami` 查看 ID。 |
 | `agent.backend` | 否 | `cursor`、`agent`（与 cursor 等价，Cursor CLI 名为 agent）、`codex`（已实现）；`gemini`、`claude`、`openclaw` _尚未实现_（默认：`cursor`） |
 | `agent.workspace` | 否 | 智能体工作目录（默认：**用户家目录** `~`） |
 | `agent.timeout` | 否 | 超时秒数（默认：300） |
@@ -54,7 +57,7 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 | `api.key` | 否 | 若设置，访问 `openab run serve` 的请求需携带 `Authorization: Bearer <api.key>`。不设则仅限本地/无鉴权使用。也可用 `openab run serve --token <key>` 覆盖本次启动的 API key。 |
 | `api.host` | 否 | `openab run serve` 监听地址（默认 `127.0.0.1`），可用 `--host` 覆盖。 |
 | `api.port` | 否 | `openab run serve` 监听端口（默认 `8000`），可用 `--port` 覆盖。 |
-| `service.run` | 否 | `openab run`（无子命令）及 **install-service** 安装的 systemd 服务启动目标，**仅从本项解析**：`serve` \| `telegram` \| `discord`。不设或无效时默认为 `serve`。 |
+| `service.run` | 否 | `openab run`（无子命令）及 **install-service** 安装的 systemd 服务启动目标，**仅从本项解析**：`serve` \| `telegram` \| `discord` \| `mattermost`。不设或无效时默认为 `serve`。 |
 
 ---
 
@@ -65,7 +68,7 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 - **端点：** `POST /v1/chat/completions`、`GET /v1/models`、`POST /v1/responses`
 - **鉴权：** 若在配置中设置了 `api.key`，请求需携带 `Authorization: Bearer <api.key>`。使用 `openab run serve --token <key>` 可覆盖配置中的 API key（仅本次生效）。若未设置且未传 `--token`，首次启动时会自动生成并写入配置并打印（每次启动也会打印当前 key）。
 - **客户端：** 使用 `base_url=http://127.0.0.1:8000/v1` 与打印的 API key。最后一条用户消息会发给当前配置的智能体，回复以 `choices[0].message.content`（chat）或 `output_text` / `output[].content`（responses）返回。**流式：** chat completions 支持 `stream: true`（单块 SSE）。
-- **自助加白名单：** 在 Telegram 或 Discord 中，任何人发送与 `api.key` 完全一致的一条消息即可被加入该平台白名单并写回配置，无需重启。
+- **自助加白名单：** 在 Telegram、Discord 或 Mattermost 中，任何人发送与 `api.key` 完全一致的一条消息即可被加入该平台白名单并写回配置，无需重启。
 
 ---
 
@@ -91,13 +94,14 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 | `openab run serve` | 启动 OpenAI API 兼容 HTTP 服务（`POST /v1/chat/completions`、`GET /v1/models`）。可选 `--token`（API key）、`--host`、`--port` 或配置 `api.key` / `api.host` / `api.port`。 |
 | `openab run telegram` | 运行 Telegram 机器人。可选 `--token`、`--workspace`、`--verbose`。 |
 | `openab run discord` | 运行 Discord 机器人。可选 `--token`、`--workspace`、`--verbose`。 |
-| `openab run` | 未指定目标时：若已配置 **service.run** 则按配置启动；否则**交互引导**选择 serve/telegram/discord 并写入配置。 |
+| `openab run mattermost` | 运行 Mattermost 机器人（WebSocket）。可选 `--server-url`、`--token`、`--workspace`、`--verbose`。 |
+| `openab run` | 未指定目标时：若已配置 **service.run** 则按配置启动；否则**交互引导**选择 serve/telegram/discord/mattermost 并写入配置。 |
 | `openab config path` | 打印配置文件路径 |
 | `openab config get [key]` | 显示配置或指定键的值 |
 | `openab config set <key> <value>` | 设置配置键并保存 |
-| `openab install-service` | 安装为 **Linux 用户级 systemd 服务**，服务通过**配置文件**启动（执行 `openab run`，目标**仅从配置中的 service.run 解析**）。可选 `--discord` 额外安装 Discord 专用服务、`--start` 立即启动。**仅 Linux。** |
+| `openab install-service` | 安装为 **Linux 用户级 systemd 服务**，服务通过**配置文件**启动（执行 `openab run`，目标**仅从配置中的 service.run 解析**）。可选 `--discord` / `--mattermost` 额外安装平台专用服务、`--start` 立即启动。**仅 Linux。** |
 
-**全局选项**（如 `openab -c /path/config.yaml run telegram`）：`--config` / `-c` 配置文件路径；`--workspace` / `-w` 工作目录；`--verbose` / `-v` 调试日志。**子命令选项**：`run telegram` / `run discord` 支持 `--token` / `-t`（Bot Token）、`--workspace`、`--verbose`；`run serve` 支持 `--token` / `-t`（API key，覆盖配置）、`--host`、`--port`。
+**全局选项**（如 `openab -c /path/config.yaml run telegram`）：`--config` / `-c` 配置文件路径；`--workspace` / `-w` 工作目录；`--verbose` / `-v` 调试日志。**子命令选项**：`run telegram` / `run discord` / `run mattermost` 支持 `--token` / `-t`（Bot Token）、`--workspace`、`--verbose`（`run mattermost` 另有 `--server-url` / `-s`）；`run serve` 支持 `--token` / `-t`（API key，覆盖配置）、`--host`、`--port`。
 
 ### Telegram 机器人
 
@@ -125,12 +129,25 @@ OpenAB 使用 **YAML 或 JSON** 配置文件。默认路径：`~/.config/openab/
 
 其他消息会转发给智能体（私信或机器人可读的频道）。
 
+### Mattermost 机器人
+
+机器人响应**私信**，以及**频道里 @它 的消息**；频道里的其他消息一律忽略。回复会贴进原消息的 thread。
+
+| 命令 | 说明 |
+|------|------|
+| `!start` | 欢迎语与鉴权状态 |
+| `!whoami` | 显示你的 Mattermost 用户 ID（用于加入白名单） |
+| `!new` | 创建新会话（下一条消息在新会话中处理） |
+| `!resume` | 不填参数时列出近期会话及其 ID（Mattermost 的交互按钮需要服务器可回调的 URL，故以文字列出） |
+| `!resume [会话ID]` | 直接切换到指定会话 |
+| `!sessions` | 说明如何查看与切换会话 |
+
 ---
 
 ## 鉴权与安全
 
-- 仅列入 `telegram.allowed_user_ids` 或 `discord.allowed_user_ids` 的用户可发送提示；其他用户会收到「未授权」提示。也可设置 `telegram.allow_all` 或 `discord.allow_all` 为 `true`（请谨慎使用）。
-- **用 token 加白名单：** 在 Telegram 或 Discord 中，发送内容与配置里 `api.key` 完全一致的一条消息，即可将发送者加入该平台白名单并写回配置（无需重启）。
+- 仅列入 `telegram.allowed_user_ids`、`discord.allowed_user_ids` 或 `mattermost.allowed_user_ids` 的用户可发送提示；其他用户会收到「未授权」提示。也可设置对应平台的 `allow_all` 为 `true`（请谨慎使用）。
+- **用 token 加白名单：** 在 Telegram、Discord 或 Mattermost 中，发送内容与配置里 `api.key` 完全一致的一条消息，即可将发送者加入该平台白名单并写回配置（无需重启）。
 - 请勿将含 token 的配置文件提交到仓库。保持 `~/.config/openab/config.yaml`（或你设置的 `OPENAB_CONFIG` 路径）私密。
 
 ---
