@@ -28,6 +28,12 @@ MAX_MESSAGE_LENGTH = 12000
 PREFIX = "!"
 _TYPING_INTERVAL = 4.0
 _RECONNECT_MAX_SECONDS = 30
+# Something in front of a Mattermost server (a reverse proxy, commonly) closes
+# a websocket that has carried no traffic for ~30 seconds. Mattermost answers
+# an application-level ping with a pong, which counts as traffic on both
+# sides, so that is the keepalive; the protocol-level heartbeat alone has been
+# seen not to survive such proxies.
+_KEEPALIVE_INTERVAL = 10.0
 
 
 def _split_message(text: str, max_len: int = MAX_MESSAGE_LENGTH) -> list[str]:
@@ -293,16 +299,25 @@ class OpenABMattermostBot:
 
     # ----- Lifecycle -----
 
+    async def _keepalive(self) -> None:
+        while True:
+            await asyncio.sleep(_KEEPALIVE_INTERVAL)
+            try:
+                await self._ws_send({"action": "ping"})
+            except Exception as e:  # noqa: BLE001 - the read loop handles a dead socket
+                logger.debug("keepalive ping: %s", e)
+
     async def _listen(self) -> None:
         assert self._session is not None
         ws_url = re.sub(r"^http", "ws", self._base, count=1) + "/api/v4/websocket"
-        async with self._session.ws_connect(ws_url, heartbeat=30) as ws:
+        async with self._session.ws_connect(ws_url, heartbeat=_KEEPALIVE_INTERVAL) as ws:
             self._ws = ws
             await self._ws_send({
                 "action": "authentication_challenge",
                 "data": {"token": self._token},
             })
             logger.info("Mattermost websocket connected as @%s", self._username)
+            keepalive_task = asyncio.create_task(self._keepalive())
             try:
                 async for msg in ws:
                     if msg.type != aiohttp.WSMsgType.TEXT:
@@ -316,6 +331,11 @@ class OpenABMattermostBot:
                         task.add_done_callback(_log_task_error)
             finally:
                 self._ws = None
+                keepalive_task.cancel()
+                try:
+                    await keepalive_task
+                except asyncio.CancelledError:
+                    pass
 
     async def run(self) -> None:
         backoff = 1
