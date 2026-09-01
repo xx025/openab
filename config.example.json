@@ -11,5 +11,10 @@
   "discord": {
     "bot_token": "",
     "allowed_user_ids": []
+  },
+  "mattermost": {
+    "server_url": "",
+    "bot_token": "",
+    "allowed_user_ids": []
   }
 }

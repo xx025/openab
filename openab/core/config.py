@@ -92,6 +92,17 @@ def parse_allowed_user_ids(raw: Any) -> frozenset[int]:
     return frozenset()
 
 
+def parse_allowed_user_ids_str(raw: Any) -> frozenset[str]:
+    """字符串型用户 ID 白名单（如 Mattermost 的 26 位 ID）；列表或逗号分隔字符串。"""
+    if raw is None:
+        return frozenset()
+    if isinstance(raw, list):
+        return frozenset(str(x).strip() for x in raw if str(x).strip())
+    if isinstance(raw, str):
+        return frozenset(x.strip() for x in raw.split(",") if x.strip())
+    return frozenset()
+
+
 def get_config_file_path() -> Path:
     """当前使用的配置文件路径；不存在时返回默认路径（用于新建）。"""
     path = _find_config_file()
@@ -108,7 +119,7 @@ def try_add_allowlist_by_api_token(
 ) -> bool:
     """
     若用户发送的内容等于配置中的 api.key，则将该用户加入对应平台白名单并写回配置。
-    platform 为 'telegram' 或 'discord'。
+    platform 为 'telegram'、'discord' 或 'mattermost'（后者的用户 ID 为字符串）。
     返回 True 表示已加入并保存，False 表示未匹配或无法写入。
     """
     if not config_path or not config_path.is_file():
@@ -131,10 +142,17 @@ def try_add_allowlist_by_api_token(
     if plat_cfg is None:
         plat_cfg = {}
         config[platform] = plat_cfg
-    allowed = parse_allowed_user_ids(plat_cfg.get("allowed_user_ids"))
-    if user_id in allowed:
-        return True
-    plat_cfg["allowed_user_ids"] = list(set(allowed) | {user_id})
+    if platform == "mattermost":
+        allowed_str = parse_allowed_user_ids_str(plat_cfg.get("allowed_user_ids"))
+        uid = str(user_id)
+        if uid in allowed_str:
+            return True
+        plat_cfg["allowed_user_ids"] = sorted(set(allowed_str) | {uid})
+    else:
+        allowed = parse_allowed_user_ids(plat_cfg.get("allowed_user_ids"))
+        if user_id in allowed:
+            return True
+        plat_cfg["allowed_user_ids"] = list(set(allowed) | {user_id})
     save_config(config, config_path)
     return True
 
@@ -165,12 +183,16 @@ def _set_nested(data: dict[str, Any], key: str, value: Any) -> None:
 _INT_KEYS = frozenset({"agent.timeout"})
 # 需要转为整数组的键（逗号分隔字符串 -> list[int]）
 _LIST_INT_KEYS = frozenset({"telegram.allowed_user_ids", "discord.allowed_user_ids"})
+# 需要转为字符串组的键（逗号分隔字符串 -> list[str]，Mattermost ID 非数字）
+_LIST_STR_KEYS = frozenset({"mattermost.allowed_user_ids"})
 
 
 def coerce_config_value(key: str, raw: str) -> Any:
     """根据键名将字符串转为合适类型。"""
     if key in _LIST_INT_KEYS:
         return [int(x.strip()) for x in raw.split(",") if x.strip().isdigit()]
+    if key in _LIST_STR_KEYS:
+        return [x.strip() for x in raw.split(",") if x.strip()]
     if key in _INT_KEYS:
         try:
             return int(raw.strip())

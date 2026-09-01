@@ -31,6 +31,14 @@ MESSAGES = {
             "发送 /whoami 可查看你的 User ID，提供给管理员。"
         ),
         "auth_allow_all_hint_discord": "管理员也可在配置中设置 discord.allow_all: true 开放给所有人使用。",
+        "auth_allow_all_hint_mattermost": "管理员也可在配置中设置 mattermost.allow_all: true 开放给所有人使用。",
+        "start_welcome_mattermost": (
+            "你好，这是 OpenAB 机器人。\n\n"
+            "私信我，或在频道里 @我 并附上内容，我会把它交给已配置的智能体处理并回复你。\n\n"
+            "发送 !whoami 可查看你的 Mattermost User ID。"
+        ),
+        "whoami_id_mattermost": "你的 Mattermost User ID：",
+        "session_resume_usage_mattermost": "使用 !resume 会列出近期会话及其 ID，发送 !resume <会话ID> 即可切换；!new 创建新会话，!resume（不带 ID）恢复为延续上一会话。",
         "allowlist_added_by_token": "已加入白名单，之后可直接发消息使用。",
         "session_new_created": "已创建新会话，下一条消息将在新会话中处理。",
         "session_resume_switched": "已切换到会话 {id}。",
@@ -71,6 +79,14 @@ MESSAGES = {
             "Send /whoami to see your User ID and ask the admin."
         ),
         "auth_allow_all_hint_discord": "Admin can also set discord.allow_all: true in config to open to everyone.",
+        "auth_allow_all_hint_mattermost": "Admin can also set mattermost.allow_all: true in config to open to everyone.",
+        "start_welcome_mattermost": (
+            "Hi, this is the OpenAB bot.\n\n"
+            "DM me, or @mention me in a channel with your request, and I'll pass it to the configured agent and reply.\n\n"
+            "Send !whoami to see your Mattermost User ID."
+        ),
+        "whoami_id_mattermost": "Your Mattermost User ID: ",
+        "session_resume_usage_mattermost": "Use !resume to list recent sessions with their IDs, then send !resume <session-id> to switch; !new starts a new session, !resume without an ID goes back to resuming the latest.",
         "allowlist_added_by_token": "Added to allowlist. You can send messages now.",
         "session_new_created": "New session created. Your next message will start a new conversation.",
         "session_resume_switched": "Switched to session {id}.",

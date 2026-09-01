@@ -18,7 +18,7 @@ OpenAB forwards messages from **chat platforms** (or HTTP API) to an agent backe
 
 | Agents | Chats / API |
 |--------|----------------|
-| **Cursor**, **Codex** (implemented)<br>_Gemini, Claude, OpenClaw not yet implemented_ | Telegram, Discord, **OpenAI-compatible HTTP API** (`openab run serve`), _more planned_ |
+| **Cursor**, **Codex** (implemented)<br>_Gemini, Claude, OpenClaw not yet implemented_ | Telegram, Discord, Mattermost, **OpenAI-compatible HTTP API** (`openab run serve`), _more planned_ |
 
 ---
 
@@ -38,10 +38,10 @@ pip install openab
 openab run
 ```
 
-You’ll choose **serve** (API), **telegram**, or **discord**, enter bot token and allowlist when asked; choices are saved to `~/.config/openab/config.yaml`. Then open your bot in the app and chat, or use the API at `http://127.0.0.1:8000/v1` with the printed key. Use `/resume` or `!resume` in chat to switch sessions.
+You’ll choose **serve** (API), **telegram**, **discord**, or **mattermost**, enter bot token and allowlist when asked; choices are saved to `~/.config/openab/config.yaml`. Then open your bot in the app and chat, or use the API at `http://127.0.0.1:8000/v1` with the printed key. Use `/resume` or `!resume` in chat to switch sessions.
 
-- **Tokens:** Telegram → [@BotFather](https://t.me/BotFather) `/newbot`; Discord → [Developer Portal](https://discord.com/developers/applications) → Bot → Reset Token.
-- **Unauthorized?** Send `/whoami` or `!whoami` to get your ID, then `openab config set telegram.allowed_user_ids "ID"` (or send the API key to the bot to self-add).
+- **Tokens:** Telegram → [@BotFather](https://t.me/BotFather) `/newbot`; Discord → [Developer Portal](https://discord.com/developers/applications) → Bot → Reset Token; Mattermost → System Console → Integrations → Bot Accounts → Create (also set `mattermost.server_url`).
+- **Unauthorized?** Send `/whoami` or `!whoami` to get your ID, then `openab config set telegram.allowed_user_ids "ID"` — for Mattermost, `openab allowlist add --mattermost <ID>` (or send the API key to the bot to self-add).
 
 Full options: [Configuration & usage](docs/en/guide.md).
 
